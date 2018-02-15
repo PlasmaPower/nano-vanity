@@ -4,6 +4,7 @@ use ocl::Result;
 use ocl::Buffer;
 use ocl::flags::MemFlags;
 use ocl::builders::ProgramBuilder;
+use ocl::builders::DeviceSpecifier;
 
 pub struct Gpu {
     kernel: ocl::Kernel,
@@ -12,14 +13,23 @@ pub struct Gpu {
 }
 
 impl Gpu {
-    pub fn new(threads: usize, public_key_req: &[u8], public_key_mask: &[u8]) -> Result<Gpu> {
+    pub fn new(
+        device: usize,
+        threads: usize,
+        public_key_req: &[u8],
+        public_key_mask: &[u8],
+    ) -> Result<Gpu> {
         let prog_bldr = ProgramBuilder::new()
             .src(include_str!("opencl/blake2b.cl"))
             .src(include_str!("opencl/curve25519-constants.cl"))
             .src(include_str!("opencl/curve25519-constants2.cl"))
             .src(include_str!("opencl/curve25519.cl"))
             .src(include_str!("opencl/entry.cl"));
-        let pro_que = ProQue::builder().prog_bldr(prog_bldr).dims(1).build()?;
+        let pro_que = ProQue::builder()
+            .prog_bldr(prog_bldr)
+            .device(DeviceSpecifier::Indices(vec![device]))
+            .dims(1)
+            .build()?;
 
         let result = Buffer::<u8>::builder()
             .queue(pro_que.queue().clone())

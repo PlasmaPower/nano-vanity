@@ -107,6 +107,14 @@ fn main() {
                 .long("simple-output")
                 .help("Output found keys in the form \"[key] [address]\""),
         )
+        .arg(
+            clap::Arg::with_name("gpu_device")
+                .long("gpu-device")
+                .value_name("DEVICE")
+                .multiple(true)
+                .default_value("0")
+                .help("The GPU device index to use"),
+        )
         .get_matches();
     let mut prefix = args.value_of("prefix").unwrap();
     if prefix.starts_with("xrb_") {
@@ -241,6 +249,10 @@ fn main() {
     }
     let mut gpu_thread = None;
     if args.is_present("gpu") {
+        let gpu_device = args.value_of("gpu_device")
+            .unwrap()
+            .parse()
+            .expect("Failed to parse GPU device index");
         let gpu_threads = args.value_of("gpu_threads")
             .unwrap()
             .parse()
@@ -249,7 +261,8 @@ fn main() {
         let found_n = found_n_base.clone();
         let attempts = attempts_base.clone();
         gpu_thread = Some(thread::spawn(move || {
-            let mut gpu = Gpu::new(gpu_threads, &public_key_req, &public_key_mask).unwrap();
+            let mut gpu =
+                Gpu::new(gpu_device, gpu_threads, &public_key_req, &public_key_mask).unwrap();
             loop {
                 rng.fill_bytes(&mut key_base);
                 let found_private_key = gpu.compute(&key_base as &[u8])
