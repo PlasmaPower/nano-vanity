@@ -21,6 +21,10 @@ cargo install
 
 For a list of options, use `nano-vanity --help`.
 
+## Wildcards
+
+You can leave a character up to chance by using `.` or `*`.
+
 ## Using your GPU
 
 This project supports using your GPU to compute the address.
