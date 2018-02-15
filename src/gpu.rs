@@ -19,10 +19,7 @@ impl Gpu {
             .src(include_str!("opencl/curve25519-constants2.cl"))
             .src(include_str!("opencl/curve25519.cl"))
             .src(include_str!("opencl/entry.cl"));
-        let pro_que = ProQue::builder()
-            .prog_bldr(prog_bldr)
-            .dims(1)
-            .build()?;
+        let pro_que = ProQue::builder().prog_bldr(prog_bldr).dims(1).build()?;
 
         let result = Buffer::<u8>::builder()
             .queue(pro_que.queue().clone())
@@ -48,7 +45,8 @@ impl Gpu {
         req.write(public_key_req).enq()?;
         mask.write(public_key_mask).enq()?;
 
-        let kernel = pro_que.create_kernel("generate_pubkey")?
+        let kernel = pro_que
+            .create_kernel("generate_pubkey")?
             .gws(threads)
             .arg_buf(&result)
             .arg_buf(&key_root)
@@ -67,7 +65,9 @@ impl Gpu {
         let mut res = [0u8; 32];
         self.result.write(&res as &[u8]).enq()?;
 
-        unsafe { self.kernel.enq()?; }
+        unsafe {
+            self.kernel.enq()?;
+        }
 
         self.result.read(&mut res as &mut [u8]).enq()?;
         Ok(res)
