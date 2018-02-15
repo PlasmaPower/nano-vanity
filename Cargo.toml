@@ -1,0 +1,20 @@
+[package]
+name = "nano-vanity"
+version = "0.1.0"
+description = "Generate NANO cryptocurrency addresses with a given prefix"
+keywords = ["cryptocurrency", "nanocurrency", "opencl"]
+authors = ["Lee Bousfield <ljbousfield@gmail.com>"]
+readme = "README.md"
+repository = "https://github.com/PlasmaPower/nano-vanity"
+license = "BSD-2-Clause"
+license-file = "LICENSE"
+
+[dependencies]
+ed25519-dalek = "0.6.1"
+blake2 = "0.7.0"
+clap = "2.30.0"
+num_cpus = "1.8.0"
+num-bigint = "0.1.43"
+rand = "0.4.2"
+hex = "0.3.1"
+ocl = "0.16.0"
