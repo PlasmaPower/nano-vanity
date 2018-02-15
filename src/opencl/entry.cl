@@ -1,4 +1,4 @@
-__kernel void generate_pubkey (__global uchar result[32], __global uchar key_root[32], __global uchar pub_req[32], __global uchar pub_mask[32]) {
+__kernel void generate_pubkey (__global uchar *result, __global uchar *key_root, __global uchar *pub_req, __global uchar *pub_mask) {
 	int const thread = get_global_id (0);
 	uchar key[32];
 	for (size_t i = 0; i < 32; i++) {
@@ -16,7 +16,7 @@ __kernel void generate_pubkey (__global uchar result[32], __global uchar key_roo
 	bignum256modm a;
 	ge25519 ALIGN(16) A;
 	expand256_modm(a, (uchar *) &hash, 32);
-	ge25519_scalarmult_base_niels(&A, ge25519_niels_base_multiples, a);
+	ge25519_scalarmult_base_niels(&A, a);
 	uchar pubkey[32];
 	ge25519_pack(pubkey, &A);
 	for (size_t i = 0; i < 32; i++) {

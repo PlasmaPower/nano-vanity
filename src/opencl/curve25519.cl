@@ -1084,7 +1084,7 @@ curve25519_contract(unsigned char out[32], const bignum25519 in) {
 
 /* out = (flag) ? in : out */
 __inline void
-curve25519_move_conditional_bytes(uint8_t out[96], constant uint8_t in[96], uint32_t flag) {
+curve25519_move_conditional_bytes(uint8_t out[96], constant uint8_t *in, uint32_t flag) {
 	const uint32_t nb = flag - 1, b = ~nb;
 	constant uint32_t *inl = (constant uint32_t *)in;
 	uint32_t *outl = (uint32_t *)out;
@@ -1402,8 +1402,9 @@ ge25519_windowb_equal(uint32_t b, uint32_t c) {
 	return ((b ^ c) - 1) >> 31;
 }
 
+// modified to remove basepoint table argument
 static void
-ge25519_scalarmult_base_choose_niels(ge25519_niels *t, constant uint8_t table[256][96], uint32_t pos, signed char b) {
+ge25519_scalarmult_base_choose_niels(ge25519_niels *t, uint32_t pos, signed char b) {
 	bignum25519 neg;
 	uint32_t sign = (uint32_t)((unsigned char)b >> 7);
 	uint32_t mask = ~(sign - 1);
@@ -1416,7 +1417,7 @@ ge25519_scalarmult_base_choose_niels(ge25519_niels *t, constant uint8_t table[25
 	packed[32] = 1;
 
 	for (i = 0; i < 8; i++)
-		curve25519_move_conditional_bytes(packed, table[(pos * 8) + i], ge25519_windowb_equal(u, i + 1));
+		curve25519_move_conditional_bytes(packed, ge25519_niels_base_multiples[(pos * 8) + i], ge25519_windowb_equal(u, i + 1));
 
 	/* expand in to t */
 	curve25519_expand(t->ysubx, packed +  0);
@@ -1433,15 +1434,16 @@ ge25519_scalarmult_base_choose_niels(ge25519_niels *t, constant uint8_t table[25
 
 
 /* computes [s]basepoint */
+// modified to remove basepoint table argument
 static void
-ge25519_scalarmult_base_niels(ge25519 *r, constant uint8_t basepoint_table[256][96], const bignum256modm s) {
+ge25519_scalarmult_base_niels(ge25519 *r, const bignum256modm s) {
 	signed char b[64];
 	uint32_t i;
 	ge25519_niels t;
 
 	contract256_window4_modm(b, s);
 
-	ge25519_scalarmult_base_choose_niels(&t, basepoint_table, 0, b[1]);
+	ge25519_scalarmult_base_choose_niels(&t, 0, b[1]);
 	curve25519_sub_reduce(r->x, t.xaddy, t.ysubx);
 	curve25519_add_reduce(r->y, t.xaddy, t.ysubx);
 	//memset(r->z, 0, sizeof(bignum25519));
@@ -1449,18 +1451,18 @@ ge25519_scalarmult_base_niels(ge25519 *r, constant uint8_t basepoint_table[256][
 	curve25519_copy(r->t, t.t2d);
 	r->z[0] = 2;	
 	for (i = 3; i < 64; i += 2) {
-		ge25519_scalarmult_base_choose_niels(&t, basepoint_table, i / 2, b[i]);
+		ge25519_scalarmult_base_choose_niels(&t, i / 2, b[i]);
 		ge25519_nielsadd2(r, &t);
 	}
 	ge25519_double_partial(r, r);
 	ge25519_double_partial(r, r);
 	ge25519_double_partial(r, r);
 	ge25519_double(r, r);
-	ge25519_scalarmult_base_choose_niels(&t, basepoint_table, 0, b[0]);
+	ge25519_scalarmult_base_choose_niels(&t, 0, b[0]);
 	curve25519_mul_const(t.t2d, t.t2d, ge25519_ecd);
 	ge25519_nielsadd2(r, &t);
 	for(i = 2; i < 64; i += 2) {
-		ge25519_scalarmult_base_choose_niels(&t, basepoint_table, i / 2, b[i]);
+		ge25519_scalarmult_base_choose_niels(&t, i / 2, b[i]);
 		ge25519_nielsadd2(r, &t);
 	}
 }
