@@ -11,6 +11,9 @@ use ed25519_dalek::{SecretKey, PublicKey};
 extern crate blake2;
 use blake2::Blake2b;
 
+extern crate digest;
+use digest::{Input, VariableOutput};
+
 extern crate clap;
 extern crate num_cpus;
 extern crate hex;
@@ -21,12 +24,34 @@ use rand::{Rng, OsRng};
 extern crate num_bigint;
 use num_bigint::BigInt;
 
+extern crate num_traits;
+use num_traits::cast::ToPrimitive;
+
 extern crate ocl;
 
 mod gpu;
 use gpu::Gpu;
 
-const ACCOUNT_LOOKUP: &str = "13456789abcdefghijkmnopqrstuwxyz";
+const ACCOUNT_LOOKUP: &[u8] = b"13456789abcdefghijkmnopqrstuwxyz";
+
+/// Only used when outputting addresses to user. Not for speed.
+fn account_encode(pubkey: [u8; 32]) -> String {
+    let mut reverse_chars = Vec::<u8>::new();
+    let mut check_hash = Blake2b::new(5).unwrap();
+    check_hash.process(&pubkey as &[u8]);
+    let mut check = [0u8; 5];
+    check_hash.variable_result(&mut check).unwrap();
+    let mut ext_addr = pubkey.to_vec();
+    ext_addr.extend(check.iter().rev());
+    let mut ext_addr = BigInt::from_bytes_be(num_bigint::Sign::Plus, &ext_addr);
+    for _ in 0..60 {
+        let n: BigInt = (&ext_addr) % 32; // lower 5 bits
+        reverse_chars.push(ACCOUNT_LOOKUP[n.to_usize().unwrap()]);
+        ext_addr = ext_addr >> 5;
+    }
+    reverse_chars.extend(b"_brx"); // xrb_ reversed
+    reverse_chars.iter().rev().map(|&c| c as char).collect::<String>()
+}
 
 fn main() {
     let args = clap::App::new("nano-vanity")
@@ -69,7 +94,7 @@ fn main() {
         let mut byte: u8 = 0;
         let mut mask: u8 = 0;
         if ch != '.' && ch != '*' {
-            let lookup = ACCOUNT_LOOKUP.chars().position(|c| c == ch);
+            let lookup = ACCOUNT_LOOKUP.iter().position(|&c| (c as char) == ch);
             match lookup {
                 Some(p) => {
                     byte = p as u8;
@@ -131,7 +156,7 @@ fn main() {
                     }
                 }
                 if matches {
-                    println!("Private key: {}", hex::encode_upper(&private_key as &[u8]));
+                    println!("{} {}", account_encode(public_key_bytes), hex::encode_upper(&private_key as &[u8]));
                     if limit != 0 && found_n.fetch_add(1, atomic::Ordering::Relaxed) + 1 >= limit {
                         process::exit(0);
                     }
@@ -169,7 +194,7 @@ fn main() {
                     }
                 }
                 if matches {
-                    println!("Private key: {}", hex::encode_upper(&found_private_key as &[u8]));
+                    println!("{} {}", account_encode(public_key_bytes), hex::encode_upper(&found_private_key as &[u8]));
                     if limit != 0 && found_n.fetch_add(1, atomic::Ordering::Relaxed) + 1 >= limit {
                         process::exit(0);
                     }
