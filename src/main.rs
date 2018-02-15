@@ -89,8 +89,8 @@ fn main() {
     }
     let mut public_key_req = BigInt::default();
     let mut public_key_mask = BigInt::default();
-    // Currently, we do not support calculating the checksum.
-    for ch in prefix.chars().chain(iter::repeat('.')).take(52) {
+    let mut prefix_chars = prefix.chars();
+    for ch in (&mut prefix_chars).chain(iter::repeat('.')).take(52) {
         let mut byte: u8 = 0;
         let mut mask: u8 = 0;
         if ch != '.' && ch != '*' {
@@ -111,6 +111,11 @@ fn main() {
         public_key_mask = public_key_mask << 5;
         public_key_mask = public_key_mask + mask;
     }
+    if prefix_chars.next().is_some() {
+        eprintln!("Warning: matching the address checksum is not yet supported.");
+        eprintln!("Only the first 52 characters of your prefix (not including xrb_) will be used.");
+        eprintln!("");
+    }
     let mut public_key_req = public_key_req.to_bytes_be().1;
     let mut public_key_mask = public_key_mask.to_bytes_be().1;
     if public_key_req.len() > 32 {
@@ -121,6 +126,7 @@ fn main() {
         eprintln!("The first character of your \"true\" address will be {}.", 1 + 2*(public_key_req[0] >> 7));
         eprintln!("You can still replace that first character with the one in your prefix, and send NANO there.");
         eprintln!("However, when you look at your account, you will always see your \"true\" address.");
+        eprintln!("");
     }
     public_key_req.resize(32, 0);
     if public_key_mask.len() > 32 {
