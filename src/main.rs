@@ -4,6 +4,7 @@ use std::thread;
 use std::sync::atomic;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
+use std::time::Duration;
 
 extern crate ed25519_dalek;
 use ed25519_dalek::{PublicKey, SecretKey};
@@ -25,7 +26,7 @@ extern crate num_bigint;
 use num_bigint::BigInt;
 
 extern crate num_traits;
-use num_traits::cast::ToPrimitive;
+use num_traits::ToPrimitive;
 
 extern crate ocl;
 
@@ -96,6 +97,16 @@ fn main() {
                 .default_value("1")
                 .help("Generate N addresses, then exit (0 for infinite)"),
         )
+        .arg(
+            clap::Arg::with_name("no_progress")
+                .long("no-progress")
+                .help("Disable progress output"),
+        )
+        .arg(
+            clap::Arg::with_name("simple_output")
+                .long("simple-output")
+                .help("Output found keys in the form \"[key] [address]\""),
+        )
         .get_matches();
     let mut prefix = args.value_of("prefix").unwrap();
     if prefix.starts_with("xrb_") {
@@ -156,15 +167,24 @@ fn main() {
     for (r, m) in public_key_req.iter_mut().zip(public_key_mask.iter_mut()) {
         *r = *r & *m;
     }
+    let mut bits_in_mask = 0;
+    for byte in &public_key_mask {
+        bits_in_mask += byte.count_ones() as usize;
+    }
+    let estimated_attempts: usize = 1 << bits_in_mask;
     let limit = args.value_of("limit")
         .unwrap()
         .parse()
         .expect("Failed to parse limit option");
     let found_n_base = Arc::new(AtomicUsize::new(0));
+    let attempts_base = Arc::new(AtomicUsize::new(0));
+    let output_progress = !args.is_present("no_progress");
+    let simple_output = args.is_present("simple_output");
     let threads = args.value_of("threads")
         .map(|s| s.parse().expect("Failed to parse thread count option"))
         .unwrap_or_else(|| num_cpus::get() - 1);
     let mut thread_handles = Vec::with_capacity(threads);
+    eprintln!("Estimated attempts needed: {}", estimated_attempts);
     let mut rng = OsRng::new().expect("Failed to get RNG for seed");
     for _ in 0..threads {
         let mut private_key = [0u8; 32];
@@ -172,10 +192,14 @@ fn main() {
         let public_key_req = public_key_req.clone();
         let public_key_mask = public_key_mask.clone();
         let found_n = found_n_base.clone();
+        let attempts = attempts_base.clone();
         thread_handles.push(thread::spawn(move || loop {
             let secret_key = SecretKey::from_bytes(&private_key).unwrap();
             let public_key = PublicKey::from_secret::<Blake2b>(&secret_key);
             let public_key_bytes = public_key.to_bytes();
+            if output_progress {
+                attempts.fetch_add(1, atomic::Ordering::Relaxed);
+            }
             let mut matches = true;
             for (byte, (req, mask)) in public_key_bytes
                 .iter()
@@ -187,11 +211,22 @@ fn main() {
                 }
             }
             if matches {
-                println!(
-                    "{} {}",
-                    account_encode(public_key_bytes),
-                    hex::encode_upper(&private_key as &[u8])
-                );
+                if output_progress {
+                    eprintln!("");
+                }
+                if simple_output {
+                    println!(
+                        "{} {}",
+                        hex::encode_upper(&private_key as &[u8]),
+                        account_encode(public_key_bytes),
+                    );
+                } else {
+                    println!(
+                        "Found matching account!\nKey:     {}\nAccount: {}",
+                        hex::encode_upper(&private_key as &[u8]),
+                        account_encode(public_key_bytes),
+                    );
+                }
                 if limit != 0 && found_n.fetch_add(1, atomic::Ordering::Relaxed) + 1 >= limit {
                     process::exit(0);
                 }
@@ -204,6 +239,7 @@ fn main() {
             }
         }));
     }
+    let mut gpu_thread = None;
     if args.is_present("gpu") {
         let gpu_threads = args.value_of("gpu_threads")
             .unwrap()
@@ -211,12 +247,16 @@ fn main() {
             .expect("Failed to parse GPU threads option");
         let mut key_base = [0u8; 32];
         let found_n = found_n_base.clone();
-        thread::spawn(move || {
+        let attempts = attempts_base.clone();
+        gpu_thread = Some(thread::spawn(move || {
             let mut gpu = Gpu::new(gpu_threads, &public_key_req, &public_key_mask).unwrap();
             loop {
                 rng.fill_bytes(&mut key_base);
                 let found_private_key = gpu.compute(&key_base as &[u8])
                     .expect("Failed to run GPU computation");
+                if output_progress {
+                    attempts.fetch_add(gpu_threads, atomic::Ordering::Relaxed);
+                }
                 if found_private_key.iter().all(|&x| x == 0) {
                     continue;
                 }
@@ -234,20 +274,44 @@ fn main() {
                     }
                 }
                 if matches {
-                    println!(
-                        "{} {}",
-                        account_encode(public_key_bytes),
-                        hex::encode_upper(&found_private_key as &[u8])
-                    );
+                    if output_progress {
+                        eprintln!("");
+                    }
+                    if simple_output {
+                        println!(
+                            "{} {}",
+                            hex::encode_upper(&found_private_key as &[u8]),
+                            account_encode(public_key_bytes),
+                        );
+                    } else {
+                        println!(
+                            "Found matching account!\nKey:     {}\nAccount: {}",
+                            hex::encode_upper(&found_private_key as &[u8]),
+                            account_encode(public_key_bytes),
+                        );
+                    }
                     if limit != 0 && found_n.fetch_add(1, atomic::Ordering::Relaxed) + 1 >= limit {
                         process::exit(0);
                     }
                 }
             }
-        }).join()
-            .expect("Failed to join GPU thread");
+        }));
+    }
+    if output_progress {
+        let attempts = attempts_base;
+        thread::spawn(move || loop {
+            let attempts = attempts.load(atomic::Ordering::Relaxed);
+            let estimated_percent = 100. * (attempts as f32) / (estimated_attempts as f32);
+            eprint!("\rTried {} keys (~{:.2}%)", attempts, estimated_percent);
+            thread::sleep(Duration::from_millis(250));
+        });
+    }
+    if let Some(gpu_thread) = gpu_thread {
+        gpu_thread.join().expect("Failed to join GPU thread");
     }
     for handle in thread_handles {
         handle.join().expect("Failed to join thread");
     }
+    eprintln!("No computation devices specified");
+    process::exit(1);
 }
