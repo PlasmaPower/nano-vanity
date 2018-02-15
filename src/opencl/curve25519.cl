@@ -706,7 +706,7 @@ curve25519_mul(bignum25519 out, const bignum25519 a, const bignum25519 b) {
 }
 
 static void
-curve25519_mul_const(bignum25519 out, const bignum25519 a, __constant bignum25519 b) {
+curve25519_mul_const(bignum25519 out, const bignum25519 a, constant uint32_t *b) {
 	uint32_t r0,r1,r2,r3,r4,r5,r6,r7,r8,r9;
 	uint32_t s0,s1,s2,s3,s4,s5,s6,s7,s8,s9;
 	uint64_t m0,m1,m2,m3,m4,m5,m6,m7,m8,m9,c;
