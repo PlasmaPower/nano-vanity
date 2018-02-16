@@ -25,6 +25,8 @@ For a list of options, use `nano-vanity --help`.
 
 You can leave a character up to chance by using `.` or `*`.
 
+You can specify that a character must be a number with `#`.
+
 ## Using your GPU
 
 This project supports using your GPU to compute the address.

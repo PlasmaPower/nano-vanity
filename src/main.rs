@@ -124,9 +124,15 @@ fn main() {
     let mut public_key_mask = BigInt::default();
     let mut prefix_chars = prefix.chars();
     for ch in (&mut prefix_chars).chain(iter::repeat('.')).take(52) {
-        let mut byte: u8 = 0;
-        let mut mask: u8 = 0;
-        if ch != '.' && ch != '*' {
+        let mut byte: u8;
+        let mut mask: u8;
+        if ch == '.' || ch == '*' {
+            byte = 0;
+            mask = 0;
+        } else if ch == '#' {
+            byte = 0;
+            mask = (1 << 5) - (1 << 3);
+        } else {
             let lookup = ACCOUNT_LOOKUP.iter().position(|&c| (c as char) == ch);
             match lookup {
                 Some(p) => {
