@@ -225,6 +225,7 @@ fn main() {
                 }
                 if matcher.matches(&public_key_bytes) {
                     if output_progress {
+                        attempts.store(0, atomic::Ordering::Relaxed);
                         eprintln!("");
                     }
                     if simple_output {
@@ -286,6 +287,7 @@ fn main() {
                 let public_key_bytes = public_key.to_bytes();
                 if matcher.matches(&public_key_bytes) {
                     if output_progress {
+                        attempts.store(0, atomic::Ordering::Relaxed);
                         eprintln!("");
                     }
                     if simple_output {
