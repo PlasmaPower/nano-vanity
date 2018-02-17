@@ -33,3 +33,25 @@ This project supports using your GPU to compute the address.
 This utilizes OpenCL, so you'll need OpenCL installed and working.
 To enable GPU use, use the `--gpu` (or `-g`) option. To disable
 use of your CPU, use `--threads 0` (or `-t 0`).
+
+## Testing randomness
+
+To test the randomness of seeds from this program, you can use dieharder
+([here](http://www.linux-mag.com/id/4125/)'s an article on it).
+
+Dieharder should not be taken as proof that this program is secure, however, it should be used as evidence, in combination
+with an examination of the program's source code.
+
+Here's an example of how to run this with dieharder:
+
+```
+nano-vanity --threads 1 --no-progress . --limit 0 --simple-output | cut -d' ' -f1 | xxd -r -p | dieharder -a -g stdin_input_raw
+```
+
+If you get a weak or failed test, run that test again by passing dieharder `-d [test]`.
+While it's statistically unlikely that a test would fail despite nothing being wrong, it can happen,
+especially given the number of tests dieharder runs.
+
+To be even more careful, you can modify nano-vanity's parameters.
+The important ones are `--simple-output`, which makes the output format easily parseable,
+and `-l 0`, which generates infinite keys instead of just one.
