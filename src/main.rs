@@ -251,8 +251,8 @@ fn main() {
         .unwrap_or_else(|| num_cpus::get() - 1);
     let mut thread_handles = Vec::with_capacity(threads);
     eprintln!("Estimated attempts needed: {}", estimated_attempts);
-    let mut rng = OsRng::new().expect("Failed to get RNG for seed");
     for _ in 0..threads {
+        let mut rng = OsRng::new().expect("Failed to get RNG for seed");
         let mut private_key = [0u8; 32];
         rng.fill_bytes(&mut private_key);
         let matcher = matcher_base.clone();
@@ -287,11 +287,13 @@ fn main() {
                     if limit != 0 && found_n.fetch_add(1, atomic::Ordering::Relaxed) + 1 >= limit {
                         process::exit(0);
                     }
-                }
-                for byte in private_key.iter_mut().rev() {
-                    *byte = byte.wrapping_add(1);
-                    if *byte != 0 {
-                        break;
+                    rng.fill_bytes(&mut private_key);
+                } else {
+                    for byte in private_key.iter_mut().rev() {
+                        *byte = byte.wrapping_add(1);
+                        if *byte != 0 {
+                            break;
+                        }
                     }
                 }
             }
@@ -314,6 +316,7 @@ fn main() {
         eprintln!("Initializing GPU");
         let mut gpu = Gpu::new(gpu_device, gpu_threads, &matcher).unwrap();
         gpu_thread = Some(thread::spawn(move || {
+            let mut rng = OsRng::new().expect("Failed to get RNG for seed");
             let mut found_private_key = [0u8; 32];
             loop {
                 rng.fill_bytes(&mut key_base);
