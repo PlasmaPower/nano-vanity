@@ -11,9 +11,7 @@ pub struct Matcher {
 
 impl Matcher {
     pub fn new(mut req: Vec<u8>, mut mask: Vec<u8>) -> Matcher {
-        for (r, m) in req.iter_mut().zip(mask.iter_mut()) {
-            *r = *r & *m;
-        }
+        debug_assert!(req.iter().zip(mask.iter()).all(|(&r, &m)| r & !m == 0));
         let prefix_len = mask.iter()
             .enumerate()
             .rev()

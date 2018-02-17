@@ -61,6 +61,23 @@ fn account_encode(pubkey: [u8; 32]) -> String {
         .collect::<String>()
 }
 
+fn char_byte_mask(ch: char) -> (u8, u8) {
+    if ch == '.' || ch == '*' {
+        (0, 0)
+    } else if ch == '#' {
+        (0, (1 << 5) - (1 << 3))
+    } else {
+        let lookup = ACCOUNT_LOOKUP.iter().position(|&c| (c as char) == ch);
+        match lookup {
+            Some(p) => (p as u8, (1 << 5) - 1),
+            None => {
+                eprintln!("Invalid character in prefix: {:?}", ch);
+                process::exit(1);
+            }
+        }
+    }
+}
+
 fn main() {
     let args = clap::App::new("nano-vanity")
         .version(env!("CARGO_PKG_VERSION"))
@@ -69,8 +86,15 @@ fn main() {
         .arg(
             clap::Arg::with_name("prefix")
                 .value_name("PREFIX")
-                .required(true)
+                .required_unless("suffix")
                 .help("The prefix for the address"),
+        )
+        .arg(
+            clap::Arg::with_name("suffix")
+                .short("s")
+                .long("suffix")
+                .value_name("SUFFIX")
+                .help("The suffix for the address (characters are ordered normally)"),
         )
         .arg(
             clap::Arg::with_name("threads")
@@ -116,47 +140,66 @@ fn main() {
                 .value_name("DEVICE")
                 .multiple(true)
                 .default_value("0")
-                .help("The GPU device index to use"),
+                .help("The GPU device index to use [default: number of cores minus one]"),
         )
         .get_matches();
-    let mut prefix = args.value_of("prefix").unwrap();
-    if prefix.starts_with("xrb_") {
-        prefix = &prefix[4..];
-    }
     let mut ext_pubkey_req = BigInt::default();
     let mut ext_pubkey_mask = BigInt::default();
-    let mut prefix_chars = prefix.chars();
-    for ch in (&mut prefix_chars).chain(iter::repeat('.')).take(60) {
-        let mut byte: u8;
-        let mut mask: u8;
-        if ch == '.' || ch == '*' {
-            byte = 0;
-            mask = 0;
-        } else if ch == '#' {
-            byte = 0;
-            mask = (1 << 5) - (1 << 3);
-        } else {
-            let lookup = ACCOUNT_LOOKUP.iter().position(|&c| (c as char) == ch);
-            match lookup {
-                Some(p) => {
-                    byte = p as u8;
-                    mask = (1 << 5) - 1;
-                }
-                None => {
-                    eprintln!("Invalid character in prefix: {:?}", ch);
-                    process::exit(1);
-                }
-            }
+    if let Some(mut prefix) = args.value_of("prefix") {
+        if prefix.starts_with("xrb_") {
+            prefix = &prefix[4..];
         }
-        ext_pubkey_req = ext_pubkey_req << 5;
-        ext_pubkey_req = ext_pubkey_req + byte;
-        ext_pubkey_mask = ext_pubkey_mask << 5;
-        ext_pubkey_mask = ext_pubkey_mask + mask;
+        let mut prefix_chars = prefix.chars();
+        let mut prefix_req = BigInt::default();
+        let mut prefix_mask = BigInt::default();
+        for ch in (&mut prefix_chars).chain(iter::repeat('.')).take(60) {
+            let (byte, mask) = char_byte_mask(ch);
+            debug_assert!(byte & !mask == 0);
+            prefix_req = prefix_req << 5;
+            prefix_req = prefix_req + byte;
+            prefix_mask = prefix_mask << 5;
+            prefix_mask = prefix_mask + mask;
+        }
+        ext_pubkey_req = prefix_req;
+        ext_pubkey_mask = prefix_mask;
+        if prefix_chars.next().is_some() {
+            eprintln!("Warning: prefix too long.");
+            eprintln!(
+                "Only the first 60 characters of your prefix (not including xrb_) will be used."
+            );
+            eprintln!("");
+        }
     }
-    if prefix_chars.next().is_some() {
-        eprintln!("Warning: prefix too long.");
-        eprintln!("Only the first 60 characters of your prefix (not including xrb_) will be used.");
-        eprintln!("");
+    if let Some(suffix) = args.value_of("suffix") {
+        let mut suffix_chars = suffix.chars();
+        let mut suffix_req = BigInt::default();
+        let mut suffix_mask = BigInt::default();
+        for ch in (&mut suffix_chars).take(60) {
+            let (byte, mask) = char_byte_mask(ch);
+            debug_assert!(byte & !mask == 0);
+            suffix_req = suffix_req << 5;
+            suffix_req = suffix_req + byte;
+            suffix_mask = suffix_mask << 5;
+            suffix_mask = suffix_mask + mask;
+        }
+        if ext_pubkey_mask
+            .to_bytes_le()
+            .1
+            .into_iter()
+            .zip(suffix_mask.to_bytes_le().1.into_iter())
+            .any(|(a, b)| a & b != 0)
+        {
+            eprintln!("Error: prefix and suffix restrict the same character position.");
+            eprintln!("Look for duplicate character positions and resolve the conflict.");
+            process::exit(1);
+        }
+        ext_pubkey_req = ext_pubkey_req + suffix_req;
+        ext_pubkey_mask = ext_pubkey_mask + suffix_mask;
+        if suffix_chars.next().is_some() {
+            eprintln!("Warning: suffix too long.");
+            eprintln!("Only the first 60 characters of your suffix will be used.");
+            eprintln!("");
+        }
     }
     let mut ext_pubkey_req = ext_pubkey_req.to_bytes_be().1;
     let mut ext_pubkey_mask = ext_pubkey_mask.to_bytes_be().1;
