@@ -6,6 +6,8 @@ use ocl::flags::MemFlags;
 use ocl::builders::ProgramBuilder;
 use ocl::builders::DeviceSpecifier;
 
+use matcher::Matcher;
+
 pub struct Gpu {
     kernel: ocl::Kernel,
     result: Buffer<u8>,
@@ -13,12 +15,7 @@ pub struct Gpu {
 }
 
 impl Gpu {
-    pub fn new(
-        device: usize,
-        threads: usize,
-        public_key_req: &[u8],
-        public_key_mask: &[u8],
-    ) -> Result<Gpu> {
+    pub fn new(device: usize, threads: usize, matcher: &Matcher) -> Result<Gpu> {
         let prog_bldr = ProgramBuilder::new()
             .src(include_str!("opencl/blake2b.cl"))
             .src(include_str!("opencl/curve25519-constants.cl"))
@@ -44,16 +41,16 @@ impl Gpu {
         let req = Buffer::<u8>::builder()
             .queue(pro_que.queue().clone())
             .flags(MemFlags::new().read_only().host_write_only())
-            .dims(64)
+            .dims(matcher.prefix_len())
             .build()?;
         let mask = Buffer::<u8>::builder()
             .queue(pro_que.queue().clone())
             .flags(MemFlags::new().read_only().host_write_only())
-            .dims(64)
+            .dims(matcher.prefix_len())
             .build()?;
 
-        req.write(public_key_req).enq()?;
-        mask.write(public_key_mask).enq()?;
+        req.write(matcher.req()).enq()?;
+        mask.write(matcher.mask()).enq()?;
 
         let kernel = pro_que
             .create_kernel("generate_pubkey")?
@@ -61,7 +58,8 @@ impl Gpu {
             .arg_buf(&result)
             .arg_buf(&key_root)
             .arg_buf(&req)
-            .arg_buf(&mask);
+            .arg_buf(&mask)
+            .arg_scl(matcher.prefix_len() as u8);
 
         Ok(Gpu {
             kernel,
@@ -70,16 +68,24 @@ impl Gpu {
         })
     }
 
-    pub fn compute(&mut self, key_root: &[u8]) -> Result<[u8; 32]> {
+    pub fn compute(&mut self, out: &mut [u8], key_root: &[u8]) -> Result<bool> {
         self.key_root.write(key_root).enq()?;
-        let mut res = [0u8; 32];
-        self.result.write(&res as &[u8]).enq()?;
+        debug_assert!(out.iter().all(|&b| b == 0));
+        debug_assert!({
+            let mut result = [0u8; 32];
+            self.result.read(&mut result as &mut [u8]).enq()?;
+            result.iter().all(|&b| b == 0)
+        });
 
         unsafe {
             self.kernel.enq()?;
         }
 
-        self.result.read(&mut res as &mut [u8]).enq()?;
-        Ok(res)
+        self.result.read(&mut *out).enq()?;
+        let success = !out.iter().all(|&b| b == 0);
+        if success {
+            self.result.write(&[0u8; 32] as &[u8]).enq()?;
+        }
+        Ok(success)
     }
 }

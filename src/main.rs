@@ -30,6 +30,9 @@ use num_traits::ToPrimitive;
 
 extern crate ocl;
 
+mod matcher;
+use matcher::Matcher;
+
 mod gpu;
 use gpu::Gpu;
 
@@ -120,10 +123,10 @@ fn main() {
     if prefix.starts_with("xrb_") {
         prefix = &prefix[4..];
     }
-    let mut public_key_req = BigInt::default();
-    let mut public_key_mask = BigInt::default();
+    let mut ext_pubkey_req = BigInt::default();
+    let mut ext_pubkey_mask = BigInt::default();
     let mut prefix_chars = prefix.chars();
-    for ch in (&mut prefix_chars).chain(iter::repeat('.')).take(52) {
+    for ch in (&mut prefix_chars).chain(iter::repeat('.')).take(60) {
         let mut byte: u8;
         let mut mask: u8;
         if ch == '.' || ch == '*' {
@@ -145,47 +148,53 @@ fn main() {
                 }
             }
         }
-        public_key_req = public_key_req << 5;
-        public_key_req = public_key_req + byte;
-        public_key_mask = public_key_mask << 5;
-        public_key_mask = public_key_mask + mask;
+        ext_pubkey_req = ext_pubkey_req << 5;
+        ext_pubkey_req = ext_pubkey_req + byte;
+        ext_pubkey_mask = ext_pubkey_mask << 5;
+        ext_pubkey_mask = ext_pubkey_mask + mask;
     }
     if prefix_chars.next().is_some() {
-        eprintln!("Warning: matching the address checksum is not yet supported.");
-        eprintln!("Only the first 52 characters of your prefix (not including xrb_) will be used.");
+        eprintln!("Warning: prefix too long.");
+        eprintln!("Only the first 60 characters of your prefix (not including xrb_) will be used.");
         eprintln!("");
     }
-    let mut public_key_req = public_key_req.to_bytes_be().1;
-    let mut public_key_mask = public_key_mask.to_bytes_be().1;
-    if public_key_req.len() > 32 {
-        let len = public_key_req.len();
-        public_key_req = public_key_req.split_off(len - 32);
+    let mut ext_pubkey_req = ext_pubkey_req.to_bytes_be().1;
+    let mut ext_pubkey_mask = ext_pubkey_mask.to_bytes_be().1;
+    if ext_pubkey_req.len() > 37 {
+        let len = ext_pubkey_req.len();
+        ext_pubkey_req = ext_pubkey_req.split_off(len - 37);
         eprintln!("Warning: requested public key required is longer than possible.");
         eprintln!("A \"true\" address can only start with 1 or 3.");
         eprintln!(
             "The first character of your \"true\" address will be {}.",
-            1 + 2 * (public_key_req[0] >> 7)
+            1 + 2 * (ext_pubkey_req[0] >> 7)
         );
-        eprintln!("You can still replace that first character with the one in your prefix, and send NANO there.");
+        eprintln!(
+            "You can still replace that first character with the one in your prefix, \
+             and send NANO there."
+        );
         eprintln!(
             "However, when you look at your account, you will always see your \"true\" address."
         );
         eprintln!("");
+    } else if ext_pubkey_req.len() < 37 {
+        ext_pubkey_req = iter::repeat(0)
+            .take(37 - ext_pubkey_req.len())
+            .chain(ext_pubkey_req.into_iter())
+            .collect();
     }
-    public_key_req.resize(32, 0);
-    if public_key_mask.len() > 32 {
-        let len = public_key_mask.len();
-        public_key_mask = public_key_mask.split_off(len - 32);
+    if ext_pubkey_mask.len() > 37 {
+        let len = ext_pubkey_mask.len();
+        ext_pubkey_mask = ext_pubkey_mask.split_off(len - 37);
+    } else if ext_pubkey_mask.len() < 37 {
+        ext_pubkey_mask = iter::repeat(0)
+            .take(37 - ext_pubkey_mask.len())
+            .chain(ext_pubkey_mask.into_iter())
+            .collect();
     }
-    public_key_mask.resize(32, 0);
-    for (r, m) in public_key_req.iter_mut().zip(public_key_mask.iter_mut()) {
-        *r = *r & *m;
-    }
-    let mut bits_in_mask = 0;
-    for byte in &public_key_mask {
-        bits_in_mask += byte.count_ones() as usize;
-    }
-    let estimated_attempts: usize = 1 << bits_in_mask;
+    let matcher_base = Matcher::new(ext_pubkey_req, ext_pubkey_mask);
+    let estimated_attempts = matcher_base.estimated_attempts();
+    let matcher_base = Arc::new(matcher_base);
     let limit = args.value_of("limit")
         .unwrap()
         .parse()
@@ -203,52 +212,43 @@ fn main() {
     for _ in 0..threads {
         let mut private_key = [0u8; 32];
         rng.fill_bytes(&mut private_key);
-        let public_key_req = public_key_req.clone();
-        let public_key_mask = public_key_mask.clone();
+        let matcher = matcher_base.clone();
         let found_n = found_n_base.clone();
         let attempts = attempts_base.clone();
-        thread_handles.push(thread::spawn(move || loop {
-            let secret_key = SecretKey::from_bytes(&private_key).unwrap();
-            let public_key = PublicKey::from_secret::<Blake2b>(&secret_key);
-            let public_key_bytes = public_key.to_bytes();
-            if output_progress {
-                attempts.fetch_add(1, atomic::Ordering::Relaxed);
-            }
-            let mut matches = true;
-            for (byte, (req, mask)) in public_key_bytes
-                .iter()
-                .zip(public_key_req.iter().zip(public_key_mask.iter()))
-            {
-                if byte & mask != *req {
-                    matches = false;
-                    break;
-                }
-            }
-            if matches {
+        thread_handles.push(thread::spawn(move || {
+            loop {
+                let secret_key = SecretKey::from_bytes(&private_key).unwrap();
+                let public_key = PublicKey::from_secret::<Blake2b>(&secret_key);
+                let public_key_bytes = public_key.to_bytes();
                 if output_progress {
-                    eprintln!("");
+                    attempts.fetch_add(1, atomic::Ordering::Relaxed);
                 }
-                if simple_output {
-                    println!(
-                        "{} {}",
-                        hex::encode_upper(&private_key as &[u8]),
-                        account_encode(public_key_bytes),
-                    );
-                } else {
-                    println!(
-                        "Found matching account!\nKey:     {}\nAccount: {}",
-                        hex::encode_upper(&private_key as &[u8]),
-                        account_encode(public_key_bytes),
-                    );
+                if matcher.matches(&public_key_bytes) {
+                    if output_progress {
+                        eprintln!("");
+                    }
+                    if simple_output {
+                        println!(
+                            "{} {}",
+                            hex::encode_upper(&private_key as &[u8]),
+                            account_encode(public_key_bytes),
+                        );
+                    } else {
+                        println!(
+                            "Found matching account!\nKey:     {}\nAccount: {}",
+                            hex::encode_upper(&private_key as &[u8]),
+                            account_encode(public_key_bytes),
+                        );
+                    }
+                    if limit != 0 && found_n.fetch_add(1, atomic::Ordering::Relaxed) + 1 >= limit {
+                        process::exit(0);
+                    }
                 }
-                if limit != 0 && found_n.fetch_add(1, atomic::Ordering::Relaxed) + 1 >= limit {
-                    process::exit(0);
-                }
-            }
-            for byte in private_key.iter_mut().rev() {
-                *byte = byte.wrapping_add(1);
-                if *byte != 0 {
-                    break;
+                for byte in private_key.iter_mut().rev() {
+                    *byte = byte.wrapping_add(1);
+                    if *byte != 0 {
+                        break;
+                    }
                 }
             }
         }));
@@ -264,35 +264,27 @@ fn main() {
             .parse()
             .expect("Failed to parse GPU threads option");
         let mut key_base = [0u8; 32];
+        let matcher = matcher_base.clone();
         let found_n = found_n_base.clone();
         let attempts = attempts_base.clone();
+        eprintln!("Initializing GPU");
+        let mut gpu = Gpu::new(gpu_device, gpu_threads, &matcher).unwrap();
         gpu_thread = Some(thread::spawn(move || {
-            let mut gpu =
-                Gpu::new(gpu_device, gpu_threads, &public_key_req, &public_key_mask).unwrap();
+            let mut found_private_key = [0u8; 32];
             loop {
                 rng.fill_bytes(&mut key_base);
-                let found_private_key = gpu.compute(&key_base as &[u8])
+                let found = gpu.compute(&mut found_private_key as _, &key_base as _)
                     .expect("Failed to run GPU computation");
                 if output_progress {
                     attempts.fetch_add(gpu_threads, atomic::Ordering::Relaxed);
                 }
-                if found_private_key.iter().all(|&x| x == 0) {
+                if !found {
                     continue;
                 }
                 let secret_key = SecretKey::from_bytes(&found_private_key).unwrap();
                 let public_key = PublicKey::from_secret::<Blake2b>(&secret_key);
                 let public_key_bytes = public_key.to_bytes();
-                let mut matches = true;
-                for (byte, (req, mask)) in public_key_bytes
-                    .iter()
-                    .zip(public_key_req.iter().zip(public_key_mask.iter()))
-                {
-                    if byte & mask != *req {
-                        matches = false;
-                        break;
-                    }
-                }
-                if matches {
+                if matcher.matches(&public_key_bytes) {
                     if output_progress {
                         eprintln!("");
                     }
@@ -312,17 +304,24 @@ fn main() {
                     if limit != 0 && found_n.fetch_add(1, atomic::Ordering::Relaxed) + 1 >= limit {
                         process::exit(0);
                     }
+                } else {
+                    eprintln!("GPU returned non-matching account");
+                }
+                for byte in &mut found_private_key {
+                    *byte = 0;
                 }
             }
         }));
     }
     if output_progress {
         let attempts = attempts_base;
-        thread::spawn(move || loop {
-            let attempts = attempts.load(atomic::Ordering::Relaxed);
-            let estimated_percent = 100. * (attempts as f32) / (estimated_attempts as f32);
-            eprint!("\rTried {} keys (~{:.2}%)", attempts, estimated_percent);
-            thread::sleep(Duration::from_millis(250));
+        thread::spawn(move || {
+            loop {
+                let attempts = attempts.load(atomic::Ordering::Relaxed);
+                let estimated_percent = 100. * (attempts as f32) / (estimated_attempts as f32);
+                eprint!("\rTried {} keys (~{:.2}%)", attempts, estimated_percent);
+                thread::sleep(Duration::from_millis(250));
+            }
         });
     }
     if let Some(gpu_thread) = gpu_thread {
