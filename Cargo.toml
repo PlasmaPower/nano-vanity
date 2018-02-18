@@ -7,6 +7,7 @@ authors = ["Lee Bousfield <ljbousfield@gmail.com>"]
 readme = "README.md"
 repository = "https://github.com/PlasmaPower/nano-vanity"
 license = "BSD-2-Clause"
+build = "build.rs"
 
 [dependencies]
 ed25519-dalek = "0.6.1"
