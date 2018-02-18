@@ -16,8 +16,11 @@ __kernel void generate_pubkey (__global uchar *result, __global uchar *key_root,
 	blake2b_state state;
 	uchar hash[64];
 	blake2b_init (&state, sizeof (hash));
+	printstate (&state);
 	blake2b_update (&state, key, 32);
+	printstate (&state);
 	blake2b_final (&state, hash, sizeof (hash));
+	printstate (&state);
 	hash[0] &= 248;
 	hash[31] &= 127;
 	hash[31] |= 64;
