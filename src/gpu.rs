@@ -51,6 +51,7 @@ impl Gpu {
 
         req.write(matcher.req()).enq()?;
         mask.write(matcher.mask()).enq()?;
+        result.write(&[0u8; 32] as &[u8]).enq()?;
 
         let kernel = pro_que
             .create_kernel("generate_pubkey")?
