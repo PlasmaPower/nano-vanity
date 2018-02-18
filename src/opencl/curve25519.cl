@@ -112,6 +112,8 @@ barrett_reduce256_modm(bignum256modm r, const bignum256modm q1, const bignum256m
 	f = (bignum256modm_element_t)c; q3[6] |= (f << 6) & 0x3fffffff; q3[7] = (f >> 24) & 0x3f; c >>= 30;
 	c += mul32x32_64(modm_mu[8], q1[8]);
 	f = (bignum256modm_element_t)c; q3[7] |= (f << 6) & 0x3fffffff; q3[8] = (bignum256modm_element_t)(c >> 24);
+	printf("c_1: %ld\n", c);
+	printf("f: %d\n", f);
 
 	/* r1 = (x mod 256^(32+1)) = x mod (2^8)(31+1) = x & ((1 << 264) - 1)
 	   r2 = (q3 * m) mod (256^(32+1)) = (q3 * m) & ((1 << 264) - 1) */
@@ -133,21 +135,47 @@ barrett_reduce256_modm(bignum256modm r, const bignum256modm q1, const bignum256m
 	r2[7] = (bignum256modm_element_t)(c & 0x3fffffff); c >>= 30;
 	c += mul32x32_64(modm_m[0], q3[8]) + mul32x32_64(modm_m[1], q3[7]) + mul32x32_64(modm_m[2], q3[6]) + mul32x32_64(modm_m[3], q3[5]) + mul32x32_64(modm_m[4], q3[4]) + mul32x32_64(modm_m[5], q3[3]) + mul32x32_64(modm_m[6], q3[2]) + mul32x32_64(modm_m[7], q3[1]) + mul32x32_64(modm_m[8], q3[0]);
 	r2[8] = (bignum256modm_element_t)(c & 0xffffff);
+	printf("c_2: %d\n", c);
+	printf("r2: ");
+	for (size_t i = 0; i < sizeof(r2); i++) {
+		printf("%d ", r2[i]);
+	}
+	printf("\n");
 
 	/* r = r1 - r2
 	   if (r < 0) r += (1 << 264) */
 	pb = 0;
+	printf("pb_n: ");
 	pb += r2[0]; b = lt_modm(r1[0], pb); r[0] = (r1[0] - pb + (b << 30)); pb = b;
+	printf(" %d", pb);
 	pb += r2[1]; b = lt_modm(r1[1], pb); r[1] = (r1[1] - pb + (b << 30)); pb = b;
+	printf(" %d", pb);
 	pb += r2[2]; b = lt_modm(r1[2], pb); r[2] = (r1[2] - pb + (b << 30)); pb = b;
+	printf(" %d", pb);
 	pb += r2[3]; b = lt_modm(r1[3], pb); r[3] = (r1[3] - pb + (b << 30)); pb = b;
+	printf(" %d", pb);
 	pb += r2[4]; b = lt_modm(r1[4], pb); r[4] = (r1[4] - pb + (b << 30)); pb = b;
+	printf(" %d", pb);
 	pb += r2[5]; b = lt_modm(r1[5], pb); r[5] = (r1[5] - pb + (b << 30)); pb = b;
+	printf(" %d", pb);
 	pb += r2[6]; b = lt_modm(r1[6], pb); r[6] = (r1[6] - pb + (b << 30)); pb = b;
+	printf(" %d", pb);
 	pb += r2[7]; b = lt_modm(r1[7], pb); r[7] = (r1[7] - pb + (b << 30)); pb = b;
+	printf(" %d", pb);
 	pb += r2[8]; b = lt_modm(r1[8], pb); r[8] = (r1[8] - pb + (b << 24));
+	printf(" %d\n", pb);
 
+	printf("r0_0:");
+	for (size_t i = 0; i < sizeof(r); i++) {
+		printf(" %d", r[i]);
+	}
+	printf("\n");
 	reduce256_modm(r);
+	printf("r0_1:");
+	for (size_t i = 0; i < sizeof(r); i++) {
+		printf(" %d", r[i]);
+	}
+	printf("\n");
 	reduce256_modm(r);
 }
 

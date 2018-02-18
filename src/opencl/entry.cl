@@ -28,11 +28,25 @@ __kernel void generate_pubkey (__global uchar *result, __global uchar *key_root,
 	for (size_t i = 0; i < sizeof(a); i++) {
 		printf("%d ", a[i]);
 	}
-	printf("\nA: ");
 	ge25519_scalarmult_base_niels(&A, a);
-	for (size_t i = 0; i < sizeof(A); i++) {
-		printf("%02X", ((uchar *) &A)[i]);
+	/*
+	printf("\nA.x: ");
+	for (size_t i = 0; i < sizeof(A.x); i++) {
+		printf("%02X", A.x[i]);
 	}
+	printf("\nA.y: ");
+	for (size_t i = 0; i < sizeof(A.y); i++) {
+		printf("%02X", A.y[i]);
+	}
+	printf("\nA.z: ");
+	for (size_t i = 0; i < sizeof(A.z); i++) {
+		printf("%02X", A.z[i]);
+	}
+	printf("\nA.t: ");
+	for (size_t i = 0; i < sizeof(A.t); i++) {
+		printf("%02X", A.t[i]);
+	}
+	*/
 	printf("\n");
 	uchar pubkey[32];
 	ge25519_pack(pubkey, &A);
