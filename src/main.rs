@@ -319,12 +319,14 @@ fn main() {
             let mut rng = OsRng::new().expect("Failed to get RNG for seed");
             let mut found_private_key = [0u8; 32];
             loop {
-                rng.fill_bytes(&mut key_base);
+                //rng.fill_bytes(&mut key_base);
+                key_base.clone_from_slice(&hex::decode(b"F104F944AF69E9E0132966A3B97B79B7664F6C87EDFEA83BF35083CB0F57B065" as &[u8]).unwrap());
                 let found = gpu.compute(&mut found_private_key as _, &key_base as _)
                     .expect("Failed to run GPU computation");
                 if output_progress {
                     attempts.fetch_add(gpu_threads, atomic::Ordering::Relaxed);
                 }
+                process::exit(1);
                 if !found {
                     continue;
                 }
