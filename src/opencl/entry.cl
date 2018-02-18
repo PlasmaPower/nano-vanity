@@ -36,6 +36,19 @@ __kernel void generate_pubkey (__global uchar *result, __global uchar *key_root,
 			return;
 		}
 	}
+	printf("key ");
+	for (size_t i = 0; i < 32; i++) {
+		printf("%02X", key[i]);
+	}
+	printf("\nhash ");
+	for (size_t i = 0; i < 32; i++) {
+		printf("%02X", hash[i]);
+	}
+	printf("\npubkey ");
+	for (size_t i = 0; i < 32; i++) {
+		printf("%02X", pubkey[i]);
+	}
+	printf("\n");
 	if (prefix_len > 32) {
 		uchar checksum[5];
 		generate_checksum (checksum, pubkey);

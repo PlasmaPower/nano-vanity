@@ -353,7 +353,10 @@ fn main() {
                         process::exit(0);
                     }
                 } else {
-                    eprintln!("GPU returned non-matching account");
+                    if output_progress {
+                        eprintln!("");
+                    }
+                    eprintln!("GPU returned non-matching key {}", hex::encode_upper(&found_private_key as &[u8]));
                 }
                 for byte in &mut found_private_key {
                     *byte = 0;
