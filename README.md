@@ -7,6 +7,9 @@ The longer the prefix, the longer it'll take to compute.
 
 First, setup Rust. The best way to do this is with [rustup](https://rustup.rs).
 
+You'll also need OpenCL. The process for this varies widely by platform,
+so your best resource there is probably Google.
+
 To install `nano-vanity` from crates.io:
 
 ```
