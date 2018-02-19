@@ -78,6 +78,64 @@ fn char_byte_mask(ch: char) -> (u8, u8) {
     }
 }
 
+struct ThreadParams {
+    limit: usize,
+    found_n: Arc<AtomicUsize>,
+    output_progress: bool,
+    attempts: Arc<AtomicUsize>,
+    simple_output: bool,
+    matcher: Arc<Matcher>,
+}
+
+fn check_soln(params: &ThreadParams, key_or_seed: [u8; 32], is_seed: bool) -> bool {
+    let private_key = if is_seed {
+        let mut private_key = [0u8; 32];
+        let mut hasher = Blake2b::new(32).unwrap();
+        hasher.process(&key_or_seed);
+        hasher.process(&[0, 0, 0, 0]);
+        hasher.variable_result(&mut private_key).unwrap();
+        private_key
+    } else {
+        key_or_seed
+    };
+    let secret_key = SecretKey::from_bytes(&private_key).unwrap();
+    let public_key = PublicKey::from_secret::<Blake2b>(&secret_key);
+    let public_key_bytes = public_key.to_bytes();
+    if params.output_progress {
+        params.attempts.fetch_add(1, atomic::Ordering::Relaxed);
+    }
+    let matches = params.matcher.matches(&public_key_bytes);
+    if matches {
+        if params.output_progress {
+            params.attempts.store(0, atomic::Ordering::Relaxed);
+            eprintln!("");
+        }
+        if params.simple_output {
+            println!(
+                "{} {}",
+                hex::encode_upper(&key_or_seed as &[u8]),
+                account_encode(public_key_bytes),
+            );
+        } else if is_seed {
+            println!(
+                "Found matching account!\nSeed:    {}\nAccount: {}",
+                hex::encode_upper(&key_or_seed as &[u8]),
+                account_encode(public_key_bytes),
+            );
+        } else {
+            println!(
+                "Found matching account!\nPrivate Key: {}\nAccount:     {}",
+                hex::encode_upper(&private_key as &[u8]),
+                account_encode(public_key_bytes),
+            );
+        }
+        if params.limit != 0 && params.found_n.fetch_add(1, atomic::Ordering::Relaxed) + 1 >= params.limit {
+            process::exit(0);
+        }
+    }
+    matches
+}
+
 fn main() {
     let args = clap::App::new("nano-vanity")
         .version(env!("CARGO_PKG_VERSION"))
@@ -97,6 +155,11 @@ fn main() {
                 .help("The suffix for the address (characters are ordered normally)"),
         )
         .arg(
+            clap::Arg::with_name("generate_seed")
+                .long("generate-seed")
+                .help("Generate a seed instead of a private key")
+        )
+        .arg(
             clap::Arg::with_name("threads")
                 .short("t")
                 .long("threads")
@@ -110,19 +173,19 @@ fn main() {
                 .help("Enable use of the GPU through OpenCL"),
         )
         .arg(
-            clap::Arg::with_name("gpu_threads")
-                .long("gpu-threads")
-                .value_name("N")
-                .default_value("1048576")
-                .help("The number of GPU threads to use"),
-        )
-        .arg(
             clap::Arg::with_name("limit")
                 .short("l")
                 .long("limit")
                 .value_name("N")
                 .default_value("1")
                 .help("Generate N addresses, then exit (0 for infinite)"),
+        )
+        .arg(
+            clap::Arg::with_name("gpu_threads")
+                .long("gpu-threads")
+                .value_name("N")
+                .default_value("1048576")
+                .help("The number of GPU threads to use"),
         )
         .arg(
             clap::Arg::with_name("no_progress")
@@ -246,6 +309,7 @@ fn main() {
     let attempts_base = Arc::new(AtomicUsize::new(0));
     let output_progress = !args.is_present("no_progress");
     let simple_output = args.is_present("simple_output");
+    let generate_seed = args.is_present("generate_seed");
     let threads = args.value_of("threads")
         .map(|s| s.parse().expect("Failed to parse thread count option"))
         .unwrap_or_else(|| num_cpus::get() - 1);
@@ -253,43 +317,25 @@ fn main() {
     eprintln!("Estimated attempts needed: {}", estimated_attempts);
     for _ in 0..threads {
         let mut rng = OsRng::new().expect("Failed to get RNG for seed");
-        let mut private_key = [0u8; 32];
-        rng.fill_bytes(&mut private_key);
-        let matcher = matcher_base.clone();
-        let found_n = found_n_base.clone();
-        let attempts = attempts_base.clone();
+        let mut key_or_seed = [0u8; 32];
+        rng.fill_bytes(&mut key_or_seed);
+        let params = ThreadParams {
+            limit,
+            output_progress,
+            simple_output,
+            matcher: matcher_base.clone(),
+            found_n: found_n_base.clone(),
+            attempts: attempts_base.clone(),
+        };
         thread_handles.push(thread::spawn(move || {
             loop {
-                let secret_key = SecretKey::from_bytes(&private_key).unwrap();
-                let public_key = PublicKey::from_secret::<Blake2b>(&secret_key);
-                let public_key_bytes = public_key.to_bytes();
-                if output_progress {
-                    attempts.fetch_add(1, atomic::Ordering::Relaxed);
-                }
-                if matcher.matches(&public_key_bytes) {
-                    if output_progress {
-                        attempts.store(0, atomic::Ordering::Relaxed);
-                        eprintln!("");
-                    }
-                    if simple_output {
-                        println!(
-                            "{} {}",
-                            hex::encode_upper(&private_key as &[u8]),
-                            account_encode(public_key_bytes),
-                        );
-                    } else {
-                        println!(
-                            "Found matching account!\nKey:     {}\nAccount: {}",
-                            hex::encode_upper(&private_key as &[u8]),
-                            account_encode(public_key_bytes),
-                        );
-                    }
-                    if limit != 0 && found_n.fetch_add(1, atomic::Ordering::Relaxed) + 1 >= limit {
-                        process::exit(0);
-                    }
-                    rng.fill_bytes(&mut private_key);
+                if check_soln(&params, key_or_seed, generate_seed) {
+                    rng.fill_bytes(&mut key_or_seed);
                 } else {
-                    for byte in private_key.iter_mut().rev() {
+                    if output_progress {
+                        params.attempts.fetch_add(1, atomic::Ordering::Relaxed);
+                    }
+                    for byte in key_or_seed.iter_mut().rev() {
                         *byte = byte.wrapping_add(1);
                         if *byte != 0 {
                             break;
@@ -310,11 +356,20 @@ fn main() {
             .parse()
             .expect("Failed to parse GPU threads option");
         let mut key_base = [0u8; 32];
-        let matcher = matcher_base.clone();
-        let found_n = found_n_base.clone();
-        let attempts = attempts_base.clone();
+        let params = ThreadParams {
+            limit,
+            output_progress,
+            simple_output,
+            matcher: matcher_base.clone(),
+            found_n: found_n_base.clone(),
+            attempts: attempts_base.clone(),
+        };
+        if generate_seed {
+            eprintln!("Seed generation is not yet supported for GPU :(");
+            process::exit(1);
+        }
         eprintln!("Initializing GPU");
-        let mut gpu = Gpu::new(gpu_device, gpu_threads, &matcher).unwrap();
+        let mut gpu = Gpu::new(gpu_device, gpu_threads, &params.matcher).unwrap();
         gpu_thread = Some(thread::spawn(move || {
             let mut rng = OsRng::new().expect("Failed to get RNG for seed");
             let mut found_private_key = [0u8; 32];
@@ -323,36 +378,12 @@ fn main() {
                 let found = gpu.compute(&mut found_private_key as _, &key_base as _)
                     .expect("Failed to run GPU computation");
                 if output_progress {
-                    attempts.fetch_add(gpu_threads, atomic::Ordering::Relaxed);
+                    params.attempts.fetch_add(gpu_threads, atomic::Ordering::Relaxed);
                 }
                 if !found {
                     continue;
                 }
-                let secret_key = SecretKey::from_bytes(&found_private_key).unwrap();
-                let public_key = PublicKey::from_secret::<Blake2b>(&secret_key);
-                let public_key_bytes = public_key.to_bytes();
-                if matcher.matches(&public_key_bytes) {
-                    if output_progress {
-                        attempts.store(0, atomic::Ordering::Relaxed);
-                        eprintln!("");
-                    }
-                    if simple_output {
-                        println!(
-                            "{} {}",
-                            hex::encode_upper(&found_private_key as &[u8]),
-                            account_encode(public_key_bytes),
-                        );
-                    } else {
-                        println!(
-                            "Found matching account!\nKey:     {}\nAccount: {}",
-                            hex::encode_upper(&found_private_key as &[u8]),
-                            account_encode(public_key_bytes),
-                        );
-                    }
-                    if limit != 0 && found_n.fetch_add(1, atomic::Ordering::Relaxed) + 1 >= limit {
-                        process::exit(0);
-                    }
-                } else {
+                if !check_soln(&params, found_private_key, false) {
                     eprintln!("GPU returned non-matching account");
                 }
                 for byte in &mut found_private_key {
