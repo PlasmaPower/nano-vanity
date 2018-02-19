@@ -24,6 +24,22 @@ cargo install
 
 For a list of options, use `nano-vanity --help`.
 
+## Seed Generation
+
+By default, `nano-vanity` generates private keys instead of seeds.
+You can use these in the desktop wallet (they're refered to as adhoc keys),
+however, most other wallets do not yet support them.
+
+You can generate seeds instead of private keys with `--generate-seed`.
+Note that doing so is a bit slower.
+
+To explain the difference between seeds and private keys:
+
+- Seeds plus an index (1st key, 2nd key, etc) generate a private key.
+  Currently, this project will always use the first index.
+- A private key generates a public key.
+- Accounts are another way of writing public keys.
+
 ## Wildcards
 
 You can leave a character up to chance by using `.` or `*`.
