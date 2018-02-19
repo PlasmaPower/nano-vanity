@@ -364,12 +364,8 @@ fn main() {
             found_n: found_n_base.clone(),
             attempts: attempts_base.clone(),
         };
-        if generate_seed {
-            eprintln!("Seed generation is not yet supported for GPU :(");
-            process::exit(1);
-        }
         eprintln!("Initializing GPU");
-        let mut gpu = Gpu::new(gpu_device, gpu_threads, &params.matcher).unwrap();
+        let mut gpu = Gpu::new(gpu_device, gpu_threads, &params.matcher, generate_seed).unwrap();
         gpu_thread = Some(thread::spawn(move || {
             let mut rng = OsRng::new().expect("Failed to get RNG for seed");
             let mut found_private_key = [0u8; 32];
@@ -383,8 +379,8 @@ fn main() {
                 if !found {
                     continue;
                 }
-                if !check_soln(&params, found_private_key, false) {
-                    eprintln!("GPU returned non-matching account");
+                if !check_soln(&params, found_private_key, generate_seed) {
+                    eprintln!("GPU returned non-matching solution: {}", hex::encode_upper(&found_private_key));
                 }
                 for byte in &mut found_private_key {
                     *byte = 0;

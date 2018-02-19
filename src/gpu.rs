@@ -15,7 +15,7 @@ pub struct Gpu {
 }
 
 impl Gpu {
-    pub fn new(device: usize, threads: usize, matcher: &Matcher) -> Result<Gpu> {
+    pub fn new(device: usize, threads: usize, matcher: &Matcher, generate_seed: bool) -> Result<Gpu> {
         let prog_bldr = ProgramBuilder::new()
             .src(include_str!("opencl/blake2b.cl"))
             .src(include_str!("opencl/curve25519-constants.cl"))
@@ -60,7 +60,8 @@ impl Gpu {
             .arg_buf(&key_root)
             .arg_buf(&req)
             .arg_buf(&mask)
-            .arg_scl(matcher.prefix_len() as u8);
+            .arg_scl(matcher.prefix_len() as u8)
+            .arg_scl(generate_seed as u8);
 
         Ok(Gpu {
             kernel,

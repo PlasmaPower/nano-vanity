@@ -6,13 +6,26 @@ inline void generate_checksum (uchar checksum[5], const uchar pubkey[32]) {
 	blake2b_final (&state, (__private uchar *) checksum, 5);
 }
 
-__kernel void generate_pubkey (__global uchar *result, __global uchar *key_root, __global uchar *pub_req, __global uchar *pub_mask, uchar prefix_len) {
+__kernel void generate_pubkey (__global uchar *result, __global uchar *key_root, __global uchar *pub_req, __global uchar *pub_mask, uchar prefix_len, uchar generate_seed) {
 	int const thread = get_global_id (0);
-	uchar key[32];
+	uchar key_or_seed[32];
 	for (size_t i = 0; i < 32; i++) {
-		key[i] = key_root[i];
+		key_or_seed[i] = key_root[i];
 	}
-	*((size_t *) key) += thread;
+	*((size_t *) key_or_seed) += thread;
+	uchar *key;
+	if (generate_seed) {
+		uchar genkey[32];
+		blake2b_state keystate;
+		blake2b_init (&keystate, sizeof (genkey));
+		blake2b_update (&keystate, key_or_seed, sizeof (key_or_seed));
+		uint idx = 0;
+		blake2b_update (&keystate, (uchar *) &idx, 4);
+		blake2b_final (&keystate, genkey, sizeof (genkey));
+		key = genkey;
+	} else {
+		key = key_or_seed;
+	}
 	blake2b_state state;
 	uchar hash[64];
 	blake2b_init (&state, sizeof (hash));
@@ -46,6 +59,6 @@ __kernel void generate_pubkey (__global uchar *result, __global uchar *key_root,
 		}
 	}
 	for (uchar i = 0; i < 32; i++) {
-		result[i] = key[i];
+		result[i] = key_or_seed[i];
 	}
 }
