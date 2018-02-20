@@ -26,7 +26,7 @@ extern crate num_bigint;
 use num_bigint::BigInt;
 
 extern crate num_traits;
-use num_traits::ToPrimitive;
+use num_traits::{ToPrimitive, Zero};
 
 extern crate ocl_core;
 extern crate ocl;
@@ -270,6 +270,10 @@ fn main() {
             eprintln!("Only the first 60 characters of your suffix will be used.");
             eprintln!("");
         }
+    }
+    if ext_pubkey_mask.is_zero() {
+        eprintln!("You must specify a non-empty prefix or suffix");
+        process::exit(1);
     }
     let mut ext_pubkey_req = ext_pubkey_req.to_bytes_be().1;
     let mut ext_pubkey_mask = ext_pubkey_mask.to_bytes_be().1;
