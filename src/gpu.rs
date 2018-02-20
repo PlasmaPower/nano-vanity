@@ -2,6 +2,7 @@ use ocl;
 use ocl::ProQue;
 use ocl::Result;
 use ocl::Buffer;
+use ocl::Platform;
 use ocl::flags::MemFlags;
 use ocl::builders::ProgramBuilder;
 use ocl::builders::DeviceSpecifier;
@@ -15,18 +16,29 @@ pub struct Gpu {
 }
 
 impl Gpu {
-    pub fn new(device: usize, threads: usize, matcher: &Matcher, generate_seed: bool) -> Result<Gpu> {
+    pub fn new(platform_idx: usize, device_idx: usize, threads: usize, matcher: &Matcher, generate_seed: bool) -> Result<Gpu> {
         let prog_bldr = ProgramBuilder::new()
             .src(include_str!("opencl/blake2b.cl"))
             .src(include_str!("opencl/curve25519-constants.cl"))
             .src(include_str!("opencl/curve25519-constants2.cl"))
             .src(include_str!("opencl/curve25519.cl"))
             .src(include_str!("opencl/entry.cl"));
+        let platforms = Platform::list();
+        if platforms.len() == 0 {
+            return Err("No OpenCL platforms exist (check your drivers and OpenCL setup)".into());
+        }
+        if platform_idx >= platforms.len() {
+            return Err(format!("Platform index {} too large (max {})", platform_idx, platforms.len() - 1).into());
+        }
         let pro_que = ProQue::builder()
             .prog_bldr(prog_bldr)
-            .device(DeviceSpecifier::Indices(vec![device]))
+            .platform(platforms[platform_idx])
+            .device(DeviceSpecifier::Indices(vec![device_idx]))
             .dims(1)
             .build()?;
+
+        let device = pro_que.device();
+        eprintln!("Initializing GPU {} {}", device.vendor(), device.name());
 
         let result = Buffer::<u8>::builder()
             .queue(pro_que.queue().clone())

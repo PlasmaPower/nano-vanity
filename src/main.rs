@@ -28,6 +28,7 @@ use num_bigint::BigInt;
 extern crate num_traits;
 use num_traits::ToPrimitive;
 
+extern crate ocl_core;
 extern crate ocl;
 
 mod matcher;
@@ -164,7 +165,7 @@ fn main() {
                 .short("t")
                 .long("threads")
                 .value_name("N")
-                .help("The number of threads to use"),
+                .help("The number of threads to use [default: number of cores minus one]"),
         )
         .arg(
             clap::Arg::with_name("gpu")
@@ -198,12 +199,18 @@ fn main() {
                 .help("Output found keys in the form \"[key] [address]\""),
         )
         .arg(
+            clap::Arg::with_name("gpu_platform")
+                .long("gpu-platform")
+                .value_name("INDEX")
+                .default_value("0")
+                .help("The GPU platform to use"),
+        )
+        .arg(
             clap::Arg::with_name("gpu_device")
                 .long("gpu-device")
-                .value_name("DEVICE")
-                .multiple(true)
+                .value_name("INDEX")
                 .default_value("0")
-                .help("The GPU device index to use [default: number of cores minus one]"),
+                .help("The GPU device to use"),
         )
         .get_matches();
     let mut ext_pubkey_req = BigInt::default();
@@ -347,6 +354,10 @@ fn main() {
     }
     let mut gpu_thread = None;
     if args.is_present("gpu") {
+        let gpu_platform = args.value_of("gpu_platform")
+            .unwrap()
+            .parse()
+            .expect("Failed to parse GPU platform index");
         let gpu_device = args.value_of("gpu_device")
             .unwrap()
             .parse()
@@ -364,8 +375,7 @@ fn main() {
             found_n: found_n_base.clone(),
             attempts: attempts_base.clone(),
         };
-        eprintln!("Initializing GPU");
-        let mut gpu = Gpu::new(gpu_device, gpu_threads, &params.matcher, generate_seed).unwrap();
+        let mut gpu = Gpu::new(gpu_platform, gpu_device, gpu_threads, &params.matcher, generate_seed).unwrap();
         gpu_thread = Some(thread::spawn(move || {
             let mut rng = OsRng::new().expect("Failed to get RNG for seed");
             let mut found_private_key = [0u8; 32];

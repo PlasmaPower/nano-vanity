@@ -53,6 +53,13 @@ This utilizes OpenCL, so you'll need OpenCL installed and working.
 To enable GPU use, use the `--gpu` (or `-g`) option. To disable
 use of your CPU, use `--threads 0` (or `-t 0`).
 
+Intel GPUs are not supported, as in most cases running the code on
+the integrated GPU is no faster than running it on the CPU.
+
+To change your GPU device, use `--gpu-device [index]`, where `[index]`
+is the index of your GPU starting at 0.
+To change your GPU platform, use `--gpu-platform [index]`.
+
 ## Testing randomness
 
 To test the randomness of seeds from this program, you can use dieharder
