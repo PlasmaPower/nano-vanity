@@ -25,28 +25,26 @@ __kernel void generate_pubkey (__global uchar *result, __global uchar *key_root,
 	ge25519 ALIGN(16) A;
 	expand256_modm(a, hash, 32);
 	printf("a: ");
-	for (size_t i = 0; i < sizeof(a); i++) {
+	for (size_t i = 0; i < 9; i++) {
 		printf("%d ", a[i]);
 	}
 	ge25519_scalarmult_base_niels(&A, a);
-	/*
-	printf("\nA.x: ");
-	for (size_t i = 0; i < sizeof(A.x); i++) {
-		printf("%02X", A.x[i]);
+	printf("\nA.x:");
+	for (size_t i = 0; i < 10; i++) {
+		printf(" %d", A.x[i]);
 	}
-	printf("\nA.y: ");
-	for (size_t i = 0; i < sizeof(A.y); i++) {
-		printf("%02X", A.y[i]);
+	printf("\nA.y:");
+	for (size_t i = 0; i < 10; i++) {
+		printf(" %d", A.y[i]);
 	}
-	printf("\nA.z: ");
-	for (size_t i = 0; i < sizeof(A.z); i++) {
-		printf("%02X", A.z[i]);
+	printf("\nA.z:");
+	for (size_t i = 0; i < 10; i++) {
+		printf(" %d", A.z[i]);
 	}
-	printf("\nA.t: ");
-	for (size_t i = 0; i < sizeof(A.t); i++) {
-		printf("%02X", A.t[i]);
+	printf("\nA.t:");
+	for (size_t i = 0; i < 10; i++) {
+		printf(" %d", A.t[i]);
 	}
-	*/
 	printf("\n");
 	uchar pubkey[32];
 	ge25519_pack(pubkey, &A);

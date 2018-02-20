@@ -51,6 +51,7 @@ impl Gpu {
 
         req.write(matcher.req()).enq()?;
         mask.write(matcher.mask()).enq()?;
+        result.write(&[0u8; 32] as &[u8]).enq()?;
 
         let kernel = pro_que
             .create_kernel("generate_pubkey")?
@@ -60,6 +61,8 @@ impl Gpu {
             .arg_buf(&req)
             .arg_buf(&mask)
             .arg_scl(matcher.prefix_len() as u8);
+
+        eprintln!("GPU info:\n{}", pro_que.device());
 
         Ok(Gpu {
             kernel,
