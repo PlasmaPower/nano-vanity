@@ -30,14 +30,17 @@ impl Matcher {
         }
     }
 
+    #[allow(dead_code)]
     pub fn req(&self) -> &[u8] {
         &self.req
     }
 
+    #[allow(dead_code)]
     pub fn mask(&self) -> &[u8] {
         &self.mask
     }
 
+    #[allow(dead_code)]
     pub fn prefix_len(&self) -> usize {
         self.prefix_len
     }

@@ -28,14 +28,34 @@ use num_bigint::BigInt;
 extern crate num_traits;
 use num_traits::{ToPrimitive, Zero};
 
+#[cfg(feature = "gpu")]
 extern crate ocl_core;
+#[cfg(feature = "gpu")]
 extern crate ocl;
 
 mod matcher;
 use matcher::Matcher;
 
+#[cfg(feature = "gpu")]
 mod gpu;
+#[cfg(feature = "gpu")]
 use gpu::Gpu;
+
+#[cfg(not(feature = "gpu"))]
+struct Gpu;
+
+#[cfg(not(feature = "gpu"))]
+impl Gpu {
+    pub fn new(_: usize, _: usize, _: usize, _: &Matcher, _: bool) -> Result<Gpu, String> {
+        eprintln!("GPU support has been disabled at compile time.");
+        eprintln!("Rebuild with \"--features gpu\" to enable GPU support.");
+        process::exit(1);
+    }
+
+    pub fn compute(&mut self, _: &mut [u8], _: &[u8]) -> Result<bool, String> {
+        unreachable!()
+    }
+}
 
 const ACCOUNT_LOOKUP: &[u8] = b"13456789abcdefghijkmnopqrstuwxyz";
 

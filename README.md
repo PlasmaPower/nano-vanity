@@ -7,9 +7,6 @@ The longer the prefix, the longer it'll take to compute.
 
 First, setup Rust. The best way to do this is with [rustup](https://rustup.rs).
 
-You'll also need OpenCL. The process for this varies widely by platform,
-so your best resource there is probably Google.
-
 To install `nano-vanity` from crates.io:
 
 ```
@@ -21,6 +18,8 @@ To install `nano-vanity` from source:
 ```
 cargo install
 ```
+
+If you want to enable GPU support, install OpenCL and add `--features gpu`.
 
 For a list of options, use `nano-vanity --help`.
 
@@ -50,6 +49,9 @@ You can specify that a character must be a number with `#`.
 
 This project supports using your GPU to compute the address.
 This utilizes OpenCL, so you'll need OpenCL installed and working.
+
+To build this project with GPU support, pass cargo `--features gpu`.
+
 To enable GPU use, use the `--gpu` (or `-g`) option. To disable
 use of your CPU, use `--threads 0` (or `-t 0`).
 
