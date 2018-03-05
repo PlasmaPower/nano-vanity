@@ -73,7 +73,7 @@ with an examination of the program's source code.
 Here's an example of how to run this with dieharder:
 
 ```
-nano-vanity --threads 1 --no-progress . --limit 0 --simple-output | cut -d' ' -f1 | xxd -r -p | dieharder -a -g stdin_input_raw
+nano-vanity --threads 1 --no-progress --limit 0 --simple-output xrb_1 | cut -d' ' -f1 | xxd -r -p | dieharder -a -g stdin_input_raw
 ```
 
 If you get a weak or failed test, run that test again by passing dieharder `-d [test]`.
