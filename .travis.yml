@@ -1,0 +1,21 @@
+language: rust
+rust:
+  - stable
+  - beta
+  - nightly
+
+matrix:
+  allow_failures:
+    - rust:
+      - beta
+      - nightly
+  fast_finish: true
+
+cache: cargo
+
+script:
+  - cargo build --verbose --release
+  - cargo test --verbose --release
+
+deploy:
+  skip_cleanup: true
