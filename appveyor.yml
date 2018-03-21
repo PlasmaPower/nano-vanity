@@ -14,23 +14,12 @@ environment:
   # Stable 64-bit MSVC
     - channel: stable
       target: x86_64-pc-windows-msvc
-  # Stable 32-bit MSVC
-    - channel: stable
-      target: i686-pc-windows-msvc
   # Beta 64-bit MSVC
     - channel: beta
       target: x86_64-pc-windows-msvc
-  # Beta 32-bit MSVC
-    - channel: beta
-      target: i686-pc-windows-msvc
   # Nightly 64-bit MSVC
     - channel: nightly
       target: x86_64-pc-windows-msvc
-      #cargoflags: --features "unstable"
-  # Nightly 32-bit MSVC
-    - channel: nightly
-      target: i686-pc-windows-msvc
-      #cargoflags: --features "unstable"
 
 ### Allowed failures ###
 # Ignore build failures on nightly/beta for CI checks
@@ -54,8 +43,14 @@ install:
 # the "directory does not contain a project or solution file" error.
 build: false
 
-# Uses 'cargo test' to run tests and build. Alternatively, the project may call compiled programs
-# directly or perform other testing commands. Rust will automatically be placed in the PATH
-# environment variable.
+before_test:
+- cargo build --release
+
 test_script:
 - cargo test --release --verbose %cargoflags%
+
+## Artifacts ##
+# Upload built files to AppVeyor cloud for deployment purposes
+artifacts:
+  - path: target/release/nano-vanity.exe
+    name: ReleaseExe
