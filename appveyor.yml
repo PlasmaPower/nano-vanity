@@ -1,56 +1,72 @@
-## Operating System (VM environment) ##
 
-# Rust needs at least Visual Studio 2013 Appveyor OS for MSVC targets.
-os: Visual Studio 2015
+# Based on the "trust" template v0.1.2
+# https://github.com/japaric/trust/tree/v0.1.2
 
-## Build Matrix ##
-# Multiple toolcahins are left to help detect bugs/regressions in nightly/
-# beta rust.
 environment:
+  global:
+    RUST_VERSION: stable
+    CRATE_NAME: nano-vanity
+
   matrix:
+    # MSVC
+    - TARGET: x86_64-pc-windows-msvc
 
-### MSVC Toolchains ###
-
-  # Stable 64-bit MSVC
-    - channel: stable
-      target: x86_64-pc-windows-msvc
-  # Beta 64-bit MSVC
-    - channel: beta
-      target: x86_64-pc-windows-msvc
-  # Nightly 64-bit MSVC
-    - channel: nightly
-      target: x86_64-pc-windows-msvc
-
-### Allowed failures ###
-# Ignore build failures on nightly/beta for CI checks
-matrix:
-  allow_failures:
-    - channel: nightly
-    - channel: beta
-
-## Install Script ##
+    # Testing other channels
+    - TARGET: x86_64-pc-windows-msvc
+      RUST_VERSION: nightly
 
 install:
-  - appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
-  - rustup-init -yv --default-toolchain %channel% --default-host %target%
-  - set PATH=%PATH%;%USERPROFILE%\.cargo\bin
-  - rustc -vV
-  - cargo -vV
-
-## Build Script ##
-
-# 'cargo test' takes care of building for us, so disable Appveyor's build stage. This prevents
-# the "directory does not contain a project or solution file" error.
-build: false
-
-before_test:
-- cargo build --release
+  - ps: >-
+      If ($Env:TARGET -eq 'x86_64-pc-windows-gnu') {
+        $Env:PATH += ';C:\msys64\mingw64\bin'
+      } ElseIf ($Env:TARGET -eq 'i686-pc-windows-gnu') {
+        $Env:PATH += ';C:\msys64\mingw32\bin'
+      }
+  - curl -sSf -o rustup-init.exe https://win.rustup.rs/
+  - rustup-init.exe -y --default-host %TARGET% --default-toolchain %RUST_VERSION%
+  - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
+  - rustc -Vv
+  - cargo -V
 
 test_script:
-- cargo test --release --verbose %cargoflags%
+  # we don't run the "test phase" when doing deploys
+  - if [%APPVEYOR_REPO_TAG%]==[false] (
+      cargo build --target %TARGET% --release &&
+      cargo test --target %TARGET% --release
+    )
 
-## Artifacts ##
-# Upload built files to AppVeyor cloud for deployment purposes
-artifacts:
-  - path: target/release/nano-vanity.exe
-    name: ReleaseExe
+before_deploy:
+  - cargo rustc --target %TARGET% --release --bin nano-vanity -- -C lto
+  - ps: ci\before_deploy.ps1
+
+deploy:
+  artifact: /.*\.zip/
+  # TODO update `auth_token.secure`
+  # - Create a `public_repo` GitHub token. Go to: https://github.com/settings/tokens/new
+  # - Encrypt it. Go to https://ci.appveyor.com/tools/encrypt
+  # - Paste the output down here
+  auth_token:
+    secure: QOGC7PPFPp4EL7A+qR+stV1WNIw6L772jsqoWXnHaYw285sgS6TkVytlkzNzEK8F
+
+  description: ''
+  on:
+    RUST_VERSION: stable
+    appveyor_repo_tag: true
+  provider: GitHub
+
+cache:
+  - C:\Users\appveyor\.cargo\registry
+  - target
+
+branches:
+  only:
+    # Release tags
+    - /^v\d+\.\d+\.\d+.*$/
+    - master
+
+notifications:
+  - provider: Email
+    on_build_success: false
+
+# Building is done in the test phase, so we disable Appveyor's build phase.
+build: false
