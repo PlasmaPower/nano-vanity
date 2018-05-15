@@ -956,34 +956,33 @@ curve25519_square_times(bignum25519 out, const bignum25519 in, int count) {
 /* Take a little-endian, 32-byte number and expand it into polynomial form */
 static void
 curve25519_expand(bignum25519 out, const unsigned char in[32]) {
-	const union { uint8_t b[2]; uint16_t s; } endian_check = {{1,0}};
 	uint32_t x0,x1,x2,x3,x4,x5,x6,x7;
 
-	if (endian_check.s == 1) {
-		x0 = *(uint32_t *)(in + 0);
-		x1 = *(uint32_t *)(in + 4);
-		x2 = *(uint32_t *)(in + 8);
-		x3 = *(uint32_t *)(in + 12);
-		x4 = *(uint32_t *)(in + 16);
-		x5 = *(uint32_t *)(in + 20);
-		x6 = *(uint32_t *)(in + 24);
-		x7 = *(uint32_t *)(in + 28);
-    } else {
-		#define F(s)                         \
-			((((uint32_t)in[s + 0])      ) | \
-			 (((uint32_t)in[s + 1]) <<  8) | \
-			 (((uint32_t)in[s + 2]) << 16) | \
-			 (((uint32_t)in[s + 3]) << 24))
-		x0 = F(0);
-		x1 = F(4);
-		x2 = F(8);
-		x3 = F(12);
-		x4 = F(16);
-		x5 = F(20);
-		x6 = F(24);
-		x7 = F(28);
-		#undef F
-	}
+#if defined(__ENDIAN_LITTLE__)
+	x0 = *(uint32_t *)(in + 0);
+	x1 = *(uint32_t *)(in + 4);
+	x2 = *(uint32_t *)(in + 8);
+	x3 = *(uint32_t *)(in + 12);
+	x4 = *(uint32_t *)(in + 16);
+	x5 = *(uint32_t *)(in + 20);
+	x6 = *(uint32_t *)(in + 24);
+	x7 = *(uint32_t *)(in + 28);
+#else
+	#define F(s)                         \
+		((((uint32_t)in[s + 0])      ) | \
+		 (((uint32_t)in[s + 1]) <<  8) | \
+		 (((uint32_t)in[s + 2]) << 16) | \
+		 (((uint32_t)in[s + 3]) << 24))
+	x0 = F(0);
+	x1 = F(4);
+	x2 = F(8);
+	x3 = F(12);
+	x4 = F(16);
+	x5 = F(20);
+	x6 = F(24);
+	x7 = F(28);
+	#undef F
+#endif
 
 	out[0] = (                        x0       ) & 0x3ffffff;
 	out[1] = ((((uint64_t)x1 << 32) | x0) >> 26) & 0x1ffffff;
