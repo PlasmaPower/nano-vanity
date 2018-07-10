@@ -17,7 +17,8 @@ pub struct Gpu {
 
 impl Gpu {
     pub fn new(platform_idx: usize, device_idx: usize, threads: usize, matcher: &Matcher, generate_seed: bool) -> Result<Gpu> {
-        let prog_bldr = ProgramBuilder::new()
+        let mut prog_bldr = ProgramBuilder::new();
+        prog_bldr
             .src(include_str!("opencl/blake2b.cl"))
             .src(include_str!("opencl/curve25519-constants.cl"))
             .src(include_str!("opencl/curve25519-constants2.cl"))
@@ -30,50 +31,49 @@ impl Gpu {
         if platform_idx >= platforms.len() {
             return Err(format!("Platform index {} too large (max {})", platform_idx, platforms.len() - 1).into());
         }
-        let pro_que = ProQue::builder()
+        let mut pro_que = ProQue::builder()
             .prog_bldr(prog_bldr)
             .platform(platforms[platform_idx])
             .device(DeviceSpecifier::Indices(vec![device_idx]))
-            .dims(1)
+            .dims(64)
             .build()?;
 
         let device = pro_que.device();
-        eprintln!("Initializing GPU {} {}", device.vendor(), device.name());
+        eprintln!("Initializing GPU {} {}", device.vendor()?, device.name()?);
 
-        let result = Buffer::<u8>::builder()
-            .queue(pro_que.queue().clone())
+        let result = pro_que
+            .buffer_builder::<u8>()
             .flags(MemFlags::new().write_only())
-            .dims(64)
             .build()?;
-        let key_root = Buffer::<u8>::builder()
-            .queue(pro_que.queue().clone())
+        let key_root = pro_que
+            .buffer_builder::<u8>()
             .flags(MemFlags::new().read_only().host_write_only())
-            .dims(64)
             .build()?;
-        let req = Buffer::<u8>::builder()
-            .queue(pro_que.queue().clone())
+        pro_que.set_dims(matcher.prefix_len());
+        let req = pro_que
+            .buffer_builder::<u8>()
             .flags(MemFlags::new().read_only().host_write_only())
-            .dims(matcher.prefix_len())
             .build()?;
-        let mask = Buffer::<u8>::builder()
-            .queue(pro_que.queue().clone())
+        let mask = pro_que
+            .buffer_builder::<u8>()
             .flags(MemFlags::new().read_only().host_write_only())
-            .dims(matcher.prefix_len())
             .build()?;
+        pro_que.set_dims(1);
 
         req.write(matcher.req()).enq()?;
         mask.write(matcher.mask()).enq()?;
         result.write(&[0u8; 32] as &[u8]).enq()?;
 
         let kernel = pro_que
-            .create_kernel("generate_pubkey")?
-            .gws(threads)
-            .arg_buf(&result)
-            .arg_buf(&key_root)
-            .arg_buf(&req)
-            .arg_buf(&mask)
-            .arg_scl(matcher.prefix_len() as u8)
-            .arg_scl(generate_seed as u8);
+            .kernel_builder("generate_pubkey")
+            .global_work_size(threads)
+            .arg(&result)
+            .arg(&key_root)
+            .arg(&req)
+            .arg(&mask)
+            .arg(matcher.prefix_len() as u8)
+            .arg(generate_seed as u8)
+            .build()?;
 
         Ok(Gpu {
             kernel,
