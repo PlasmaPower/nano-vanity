@@ -1,9 +1,9 @@
-use std::process;
 use std::iter;
-use std::thread;
+use std::process;
 use std::sync::atomic;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
+use std::thread;
 use std::time::Duration;
 
 extern crate ed25519_dalek;
@@ -29,9 +29,9 @@ extern crate num_traits;
 use num_traits::{ToPrimitive, Zero};
 
 #[cfg(feature = "gpu")]
-extern crate ocl_core;
-#[cfg(feature = "gpu")]
 extern crate ocl;
+#[cfg(feature = "gpu")]
+extern crate ocl_core;
 
 mod matcher;
 use matcher::Matcher;
@@ -150,7 +150,9 @@ fn check_soln(params: &ThreadParams, key_or_seed: [u8; 32], is_seed: bool) -> bo
                 account_encode(public_key_bytes),
             );
         }
-        if params.limit != 0 && params.found_n.fetch_add(1, atomic::Ordering::Relaxed) + 1 >= params.limit {
+        if params.limit != 0
+            && params.found_n.fetch_add(1, atomic::Ordering::Relaxed) + 1 >= params.limit
+        {
             process::exit(0);
         }
     }
@@ -178,7 +180,7 @@ fn main() {
         .arg(
             clap::Arg::with_name("generate_seed")
                 .long("generate-seed")
-                .help("Generate a seed instead of a private key")
+                .help("Generate a seed instead of a private key"),
         )
         .arg(
             clap::Arg::with_name("threads")
@@ -298,22 +300,10 @@ fn main() {
     let mut ext_pubkey_req = ext_pubkey_req.to_bytes_be().1;
     let mut ext_pubkey_mask = ext_pubkey_mask.to_bytes_be().1;
     if ext_pubkey_req.len() > 37 {
-        let len = ext_pubkey_req.len();
-        ext_pubkey_req = ext_pubkey_req.split_off(len - 37);
-        eprintln!("Warning: requested public key required is longer than possible.");
-        eprintln!("A \"true\" address can only start with 1 or 3.");
-        eprintln!(
-            "The first character of your \"true\" address will be {}.",
-            1 + 2 * (ext_pubkey_req[0] >> 7)
-        );
-        eprintln!(
-            "You can still replace that first character with the one in your prefix, \
-             and send NANO there."
-        );
-        eprintln!(
-            "However, when you look at your account, you will always see your \"true\" address."
-        );
-        eprintln!("");
+        eprintln!("Error: requested public key required is longer than possible.");
+        eprintln!("An address can only start with 1 or 3.");
+        eprintln!("To generate the prefix after that, add a period to the beginning of your prefix.");
+        process::exit(1);
     } else if ext_pubkey_req.len() < 37 {
         ext_pubkey_req = iter::repeat(0)
             .take(37 - ext_pubkey_req.len())
@@ -358,19 +348,17 @@ fn main() {
             found_n: found_n_base.clone(),
             attempts: attempts_base.clone(),
         };
-        thread_handles.push(thread::spawn(move || {
-            loop {
-                if check_soln(&params, key_or_seed, generate_seed) {
-                    rng.fill_bytes(&mut key_or_seed);
-                } else {
-                    if output_progress {
-                        params.attempts.fetch_add(1, atomic::Ordering::Relaxed);
-                    }
-                    for byte in key_or_seed.iter_mut().rev() {
-                        *byte = byte.wrapping_add(1);
-                        if *byte != 0 {
-                            break;
-                        }
+        thread_handles.push(thread::spawn(move || loop {
+            if check_soln(&params, key_or_seed, generate_seed) {
+                rng.fill_bytes(&mut key_or_seed);
+            } else {
+                if output_progress {
+                    params.attempts.fetch_add(1, atomic::Ordering::Relaxed);
+                }
+                for byte in key_or_seed.iter_mut().rev() {
+                    *byte = byte.wrapping_add(1);
+                    if *byte != 0 {
+                        break;
                     }
                 }
             }
@@ -399,7 +387,13 @@ fn main() {
             found_n: found_n_base.clone(),
             attempts: attempts_base.clone(),
         };
-        let mut gpu = Gpu::new(gpu_platform, gpu_device, gpu_threads, &params.matcher, generate_seed).unwrap();
+        let mut gpu = Gpu::new(
+            gpu_platform,
+            gpu_device,
+            gpu_threads,
+            &params.matcher,
+            generate_seed,
+        ).unwrap();
         gpu_thread = Some(thread::spawn(move || {
             let mut rng = OsRng::new().expect("Failed to get RNG for seed");
             let mut found_private_key = [0u8; 32];
@@ -408,13 +402,18 @@ fn main() {
                 let found = gpu.compute(&mut found_private_key as _, &key_base as _)
                     .expect("Failed to run GPU computation");
                 if output_progress {
-                    params.attempts.fetch_add(gpu_threads, atomic::Ordering::Relaxed);
+                    params
+                        .attempts
+                        .fetch_add(gpu_threads, atomic::Ordering::Relaxed);
                 }
                 if !found {
                     continue;
                 }
                 if !check_soln(&params, found_private_key, generate_seed) {
-                    eprintln!("GPU returned non-matching solution: {}", hex::encode_upper(&found_private_key));
+                    eprintln!(
+                        "GPU returned non-matching solution: {}",
+                        hex::encode_upper(&found_private_key)
+                    );
                 }
                 for byte in &mut found_private_key {
                     *byte = 0;
@@ -424,13 +423,11 @@ fn main() {
     }
     if output_progress {
         let attempts = attempts_base;
-        thread::spawn(move || {
-            loop {
-                let attempts = attempts.load(atomic::Ordering::Relaxed);
-                let estimated_percent = 100. * (attempts as f32) / (estimated_attempts as f32);
-                eprint!("\rTried {} keys (~{:.2}%)", attempts, estimated_percent);
-                thread::sleep(Duration::from_millis(250));
-            }
+        thread::spawn(move || loop {
+            let attempts = attempts.load(atomic::Ordering::Relaxed);
+            let estimated_percent = 100. * (attempts as f32) / (estimated_attempts as f32);
+            eprint!("\rTried {} keys (~{:.2}%)", attempts, estimated_percent);
+            thread::sleep(Duration::from_millis(250));
         });
     }
     if let Some(gpu_thread) = gpu_thread {

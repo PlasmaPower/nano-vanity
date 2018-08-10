@@ -1,6 +1,6 @@
 [package]
 name = "nano-vanity"
-version = "0.4.1"
+version = "0.4.2"
 description = "Generate NANO cryptocurrency addresses with a given prefix"
 keywords = ["cryptocurrency", "nanocurrency", "opencl"]
 authors = ["Lee Bousfield <ljbousfield@gmail.com>"]
