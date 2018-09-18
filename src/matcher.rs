@@ -2,6 +2,7 @@ use std::cmp;
 
 use blake2::Blake2b;
 use digest::{Input, VariableOutput};
+use num_bigint::BigInt;
 
 pub struct Matcher {
     req: Vec<u8>,
@@ -65,11 +66,11 @@ impl Matcher {
         true
     }
 
-    pub fn estimated_attempts(&self) -> usize {
+    pub fn estimated_attempts(&self) -> BigInt {
         let mut bits_in_mask = 0;
         for byte in &self.mask {
             bits_in_mask += byte.count_ones() as usize;
         }
-        1 << bits_in_mask
+        BigInt::from(1) << bits_in_mask
     }
 }

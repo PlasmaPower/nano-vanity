@@ -1,3 +1,4 @@
+use std::f64;
 use std::iter;
 use std::process;
 use std::sync::atomic;
@@ -302,7 +303,9 @@ fn main() {
     if ext_pubkey_req.len() > 37 {
         eprintln!("Error: requested public key required is longer than possible.");
         eprintln!("An address can only start with 1 or 3.");
-        eprintln!("To generate the prefix after that, add a period to the beginning of your prefix.");
+        eprintln!(
+            "To generate the prefix after that, add a period to the beginning of your prefix."
+        );
         process::exit(1);
     } else if ext_pubkey_req.len() < 37 {
         ext_pubkey_req = iter::repeat(0)
@@ -425,7 +428,8 @@ fn main() {
         let attempts = attempts_base;
         thread::spawn(move || loop {
             let attempts = attempts.load(atomic::Ordering::Relaxed);
-            let estimated_percent = 100. * (attempts as f32) / (estimated_attempts as f32);
+            let estimated_percent =
+                100. * (attempts as f64) / estimated_attempts.to_f64().unwrap_or(f64::INFINITY);
             eprint!("\rTried {} keys (~{:.2}%)", attempts, estimated_percent);
             thread::sleep(Duration::from_millis(250));
         });
