@@ -19,9 +19,9 @@ To install `nano-vanity` from source:
 cargo install
 ```
 
-If you want to enable GPU support, install OpenCL and add `--features gpu`.
+If you want to enable GPU support, install OpenCL and add `--features gpu` to the install command.
 
-For a list of options, use `nano-vanity --help`.
+For a list of `nano-vanity` options, use `nano-vanity --help`.
 
 ## Seed Generation
 
