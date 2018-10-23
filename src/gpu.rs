@@ -1,13 +1,13 @@
 use ocl;
-use ocl::ProQue;
-use ocl::Result;
+use ocl::builders::DeviceSpecifier;
+use ocl::builders::ProgramBuilder;
+use ocl::flags::MemFlags;
 use ocl::Buffer;
 use ocl::Platform;
-use ocl::flags::MemFlags;
-use ocl::builders::ProgramBuilder;
-use ocl::builders::DeviceSpecifier;
+use ocl::ProQue;
+use ocl::Result;
 
-use matcher::Matcher;
+use matcher::{GenerateKeyType, Matcher};
 
 pub struct Gpu {
     kernel: ocl::Kernel,
@@ -16,7 +16,13 @@ pub struct Gpu {
 }
 
 impl Gpu {
-    pub fn new(platform_idx: usize, device_idx: usize, threads: usize, matcher: &Matcher, generate_seed: bool) -> Result<Gpu> {
+    pub fn new(
+        platform_idx: usize,
+        device_idx: usize,
+        threads: usize,
+        matcher: &Matcher,
+        generate_key_type: GenerateKeyType,
+    ) -> Result<Gpu> {
         let mut prog_bldr = ProgramBuilder::new();
         prog_bldr
             .src(include_str!("opencl/blake2b.cl"))
@@ -29,7 +35,11 @@ impl Gpu {
             return Err("No OpenCL platforms exist (check your drivers and OpenCL setup)".into());
         }
         if platform_idx >= platforms.len() {
-            return Err(format!("Platform index {} too large (max {})", platform_idx, platforms.len() - 1).into());
+            return Err(format!(
+                "Platform index {} too large (max {})",
+                platform_idx,
+                platforms.len() - 1
+            ).into());
         }
         let mut pro_que = ProQue::builder()
             .prog_bldr(prog_bldr)
@@ -58,11 +68,25 @@ impl Gpu {
             .buffer_builder::<u8>()
             .flags(MemFlags::new().read_only().host_write_only())
             .build()?;
+        pro_que.set_dims(32);
+        let public_offset = pro_que
+            .buffer_builder::<u8>()
+            .flags(MemFlags::new().read_only().host_write_only())
+            .build()?;
         pro_que.set_dims(1);
 
         req.write(matcher.req()).enq()?;
         mask.write(matcher.mask()).enq()?;
         result.write(&[0u8; 32] as &[u8]).enq()?;
+        let gen_key_ty_code: u8 = match generate_key_type {
+            GenerateKeyType::PrivateKey => 0,
+            GenerateKeyType::Seed => 1,
+            GenerateKeyType::ExtendedPrivateKey(offset) => {
+                let compressed = offset.compress();
+                public_offset.write(compressed.as_bytes() as &[u8]).enq()?;
+                2
+            }
+        };
 
         let kernel = pro_que
             .kernel_builder("generate_pubkey")
@@ -72,7 +96,8 @@ impl Gpu {
             .arg(&req)
             .arg(&mask)
             .arg(matcher.prefix_len() as u8)
-            .arg(generate_seed as u8)
+            .arg(gen_key_ty_code)
+            .arg(&public_offset)
             .build()?;
 
         Ok(Gpu {

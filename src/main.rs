@@ -7,6 +7,11 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
+extern crate curve25519_dalek;
+use curve25519_dalek::constants::ED25519_BASEPOINT_TABLE;
+use curve25519_dalek::edwards::CompressedEdwardsY;
+use curve25519_dalek::scalar::Scalar as CurveScalar;
+
 extern crate ed25519_dalek;
 use ed25519_dalek::{PublicKey, SecretKey};
 
@@ -35,7 +40,7 @@ extern crate ocl;
 extern crate ocl_core;
 
 mod matcher;
-use matcher::Matcher;
+use matcher::{Matcher, GenerateKeyType};
 
 #[cfg(feature = "gpu")]
 mod gpu;
@@ -106,27 +111,36 @@ struct ThreadParams {
     output_progress: bool,
     attempts: Arc<AtomicUsize>,
     simple_output: bool,
+    generate_key_type: GenerateKeyType,
     matcher: Arc<Matcher>,
 }
 
-fn check_soln(params: &ThreadParams, key_or_seed: [u8; 32], is_seed: bool) -> bool {
-    let private_key = if is_seed {
-        let mut private_key = [0u8; 32];
-        let mut hasher = Blake2b::new(32).unwrap();
-        hasher.process(&key_or_seed);
-        hasher.process(&[0, 0, 0, 0]);
-        hasher.variable_result(&mut private_key).unwrap();
-        private_key
-    } else {
-        key_or_seed
+fn check_soln(params: &ThreadParams, key_material: [u8; 32]) -> bool {
+    fn sec_to_pub(sec: &[u8; 32]) -> [u8; 32] {
+        let secret_key = SecretKey::from_bytes(sec).unwrap();
+        let public_key = PublicKey::from_secret::<Blake2b>(&secret_key);
+        public_key.to_bytes()
+    }
+    let public_key = match params.generate_key_type {
+        GenerateKeyType::PrivateKey => sec_to_pub(&key_material),
+        GenerateKeyType::Seed => {
+            let mut private_key = [0u8; 32];
+            let mut hasher = Blake2b::new(32).unwrap();
+            hasher.process(&key_material);
+            hasher.process(&[0, 0, 0, 0]);
+            hasher.variable_result(&mut private_key).unwrap();
+            sec_to_pub(&private_key)
+        }
+        GenerateKeyType::ExtendedPrivateKey(offset) => {
+            let scalar = CurveScalar::from_bytes_mod_order(key_material);
+            let curvepoint = &scalar * &ED25519_BASEPOINT_TABLE;
+            (&curvepoint + &offset).compress().to_bytes()
+        }
     };
-    let secret_key = SecretKey::from_bytes(&private_key).unwrap();
-    let public_key = PublicKey::from_secret::<Blake2b>(&secret_key);
-    let public_key_bytes = public_key.to_bytes();
     if params.output_progress {
         params.attempts.fetch_add(1, atomic::Ordering::Relaxed);
     }
-    let matches = params.matcher.matches(&public_key_bytes);
+    let matches = params.matcher.matches(&public_key);
     if matches {
         if params.output_progress {
             params.attempts.store(0, atomic::Ordering::Relaxed);
@@ -135,21 +149,33 @@ fn check_soln(params: &ThreadParams, key_or_seed: [u8; 32], is_seed: bool) -> bo
         if params.simple_output {
             println!(
                 "{} {}",
-                hex::encode_upper(&key_or_seed as &[u8]),
-                account_encode(public_key_bytes),
-            );
-        } else if is_seed {
-            println!(
-                "Found matching account!\nSeed:    {}\nAccount: {}",
-                hex::encode_upper(&key_or_seed as &[u8]),
-                account_encode(public_key_bytes),
+                hex::encode_upper(&key_material as &[u8]),
+                account_encode(public_key),
             );
         } else {
-            println!(
-                "Found matching account!\nPrivate Key: {}\nAccount:     {}",
-                hex::encode_upper(&private_key as &[u8]),
-                account_encode(public_key_bytes),
-            );
+            match params.generate_key_type {
+                GenerateKeyType::PrivateKey => {
+                    println!(
+                        "Found matching account!\nPrivate Key: {}\nAccount:     {}",
+                        hex::encode_upper(&key_material as &[u8]),
+                        account_encode(public_key),
+                    );
+                }
+                GenerateKeyType::Seed => {
+                    println!(
+                        "Found matching account!\nSeed:    {}\nAccount: {}",
+                        hex::encode_upper(&key_material as &[u8]),
+                        account_encode(public_key),
+                    );
+                }
+                GenerateKeyType::ExtendedPrivateKey(_) => {
+                    println!(
+                        "Found matching account!\nExtended private key: {}\nAccount:              {}",
+                        hex::encode_upper(&key_material as &[u8]),
+                        account_encode(public_key),
+                    );
+                }
+            }
         }
         if params.limit != 0
             && params.found_n.fetch_add(1, atomic::Ordering::Relaxed) + 1 >= params.limit
@@ -170,72 +196,69 @@ fn main() {
                 .value_name("PREFIX")
                 .required_unless("suffix")
                 .help("The prefix for the address"),
-        )
-        .arg(
+        ).arg(
             clap::Arg::with_name("suffix")
                 .short("s")
                 .long("suffix")
                 .value_name("SUFFIX")
                 .help("The suffix for the address (characters are ordered normally)"),
-        )
-        .arg(
+        ).arg(
             clap::Arg::with_name("generate_seed")
                 .long("generate-seed")
                 .help("Generate a seed instead of a private key"),
-        )
-        .arg(
+        ).arg(
             clap::Arg::with_name("threads")
                 .short("t")
                 .long("threads")
                 .value_name("N")
                 .help("The number of threads to use [default: number of cores minus one]"),
-        )
-        .arg(
+        ).arg(
             clap::Arg::with_name("gpu")
                 .short("g")
                 .long("gpu")
                 .help("Enable use of the GPU through OpenCL"),
-        )
-        .arg(
+        ).arg(
             clap::Arg::with_name("limit")
                 .short("l")
                 .long("limit")
                 .value_name("N")
                 .default_value("1")
                 .help("Generate N addresses, then exit (0 for infinite)"),
-        )
-        .arg(
+        ).arg(
             clap::Arg::with_name("gpu_threads")
                 .long("gpu-threads")
                 .value_name("N")
                 .default_value("1048576")
                 .help("The number of GPU threads to use"),
-        )
-        .arg(
+        ).arg(
             clap::Arg::with_name("no_progress")
                 .long("no-progress")
                 .help("Disable progress output"),
-        )
-        .arg(
+        ).arg(
             clap::Arg::with_name("simple_output")
                 .long("simple-output")
                 .help("Output found keys in the form \"[key] [address]\""),
-        )
-        .arg(
+        ).arg(
             clap::Arg::with_name("gpu_platform")
                 .long("gpu-platform")
                 .value_name("INDEX")
                 .default_value("0")
                 .help("The GPU platform to use"),
-        )
-        .arg(
+        ).arg(
             clap::Arg::with_name("gpu_device")
                 .long("gpu-device")
                 .value_name("INDEX")
                 .default_value("0")
                 .help("The GPU device to use"),
-        )
-        .get_matches();
+        ).arg(
+            clap::Arg::with_name("public_offset")
+                .long("public-offset")
+                .conflicts_with("generate_seed")
+                .value_name("HEX")
+                .help(
+                    "The curve point of the blinding factor (used to mine keys for somebody else)",
+                ),
+        ).get_matches();
     let mut ext_pubkey_req = BigInt::default();
     let mut ext_pubkey_mask = BigInt::default();
     if let Some(mut prefix) = args.value_of("prefix") {
@@ -325,7 +348,8 @@ fn main() {
     let matcher_base = Matcher::new(ext_pubkey_req, ext_pubkey_mask);
     let estimated_attempts = matcher_base.estimated_attempts();
     let matcher_base = Arc::new(matcher_base);
-    let limit = args.value_of("limit")
+    let limit = args
+        .value_of("limit")
         .unwrap()
         .parse()
         .expect("Failed to parse limit option");
@@ -334,7 +358,32 @@ fn main() {
     let output_progress = !args.is_present("no_progress");
     let simple_output = args.is_present("simple_output");
     let generate_seed = args.is_present("generate_seed");
-    let threads = args.value_of("threads")
+    let public_offset_bytes = args.value_of("public_offset").map(hex::decode).map(|r| {
+        let bytes = r.expect("Failed to parse public offset as hex");
+        if bytes.len() != 32 {
+            panic!(
+                "Public offset length was {} bytes, not 32 bytes as expected",
+                bytes.len(),
+            );
+        }
+        let mut slice = [0u8; 32];
+        slice.copy_from_slice(&bytes);
+        slice
+    });
+    let public_offset = public_offset_bytes.map(|b| {
+        CompressedEdwardsY(b)
+            .decompress()
+            .expect("Public offset was not valid edwards curve point")
+    });
+    let gen_key_ty = if let Some(offset) = public_offset {
+        GenerateKeyType::ExtendedPrivateKey(offset)
+    } else if generate_seed {
+        GenerateKeyType::Seed
+    } else {
+        GenerateKeyType::PrivateKey
+    };
+    let threads = args
+        .value_of("threads")
         .map(|s| s.parse().expect("Failed to parse thread count option"))
         .unwrap_or_else(|| num_cpus::get() - 1);
     let mut thread_handles = Vec::with_capacity(threads);
@@ -347,12 +396,13 @@ fn main() {
             limit,
             output_progress,
             simple_output,
+            generate_key_type: gen_key_ty.clone(),
             matcher: matcher_base.clone(),
             found_n: found_n_base.clone(),
             attempts: attempts_base.clone(),
         };
         thread_handles.push(thread::spawn(move || loop {
-            if check_soln(&params, key_or_seed, generate_seed) {
+            if check_soln(&params, key_or_seed) {
                 rng.fill_bytes(&mut key_or_seed);
             } else {
                 if output_progress {
@@ -369,15 +419,18 @@ fn main() {
     }
     let mut gpu_thread = None;
     if args.is_present("gpu") {
-        let gpu_platform = args.value_of("gpu_platform")
+        let gpu_platform = args
+            .value_of("gpu_platform")
             .unwrap()
             .parse()
             .expect("Failed to parse GPU platform index");
-        let gpu_device = args.value_of("gpu_device")
+        let gpu_device = args
+            .value_of("gpu_device")
             .unwrap()
             .parse()
             .expect("Failed to parse GPU device index");
-        let gpu_threads = args.value_of("gpu_threads")
+        let gpu_threads = args
+            .value_of("gpu_threads")
             .unwrap()
             .parse()
             .expect("Failed to parse GPU threads option");
@@ -386,6 +439,7 @@ fn main() {
             limit,
             output_progress,
             simple_output,
+            generate_key_type: gen_key_ty.clone(),
             matcher: matcher_base.clone(),
             found_n: found_n_base.clone(),
             attempts: attempts_base.clone(),
@@ -395,24 +449,25 @@ fn main() {
             gpu_device,
             gpu_threads,
             &params.matcher,
-            generate_seed,
+            gen_key_ty,
         ).unwrap();
         gpu_thread = Some(thread::spawn(move || {
             let mut rng = OsRng::new().expect("Failed to get RNG for seed");
             let mut found_private_key = [0u8; 32];
             loop {
                 rng.fill_bytes(&mut key_base);
-                let found = gpu.compute(&mut found_private_key as _, &key_base as _)
+                let found = gpu
+                    .compute(&mut found_private_key as _, &key_base as _)
                     .expect("Failed to run GPU computation");
                 if output_progress {
                     params
                         .attempts
-                        .fetch_add(gpu_threads, atomic::Ordering::Relaxed);
+                        .fetch_add(gpu_threads - 1, atomic::Ordering::Relaxed);
                 }
                 if !found {
                     continue;
                 }
-                if !check_soln(&params, found_private_key, generate_seed) {
+                if !check_soln(&params, found_private_key) {
                     eprintln!(
                         "GPU returned non-matching solution: {}",
                         hex::encode_upper(&found_private_key)

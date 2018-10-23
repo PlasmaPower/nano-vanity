@@ -1,8 +1,17 @@
 use std::cmp;
 
 use blake2::Blake2b;
+use curve25519_dalek::edwards::EdwardsPoint;
 use digest::{Input, VariableOutput};
 use num_bigint::BigInt;
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum GenerateKeyType {
+    PrivateKey,
+    Seed,
+    /// Parameter is public offset
+    ExtendedPrivateKey(EdwardsPoint),
+}
 
 pub struct Matcher {
     req: Vec<u8>,
@@ -13,7 +22,8 @@ pub struct Matcher {
 impl Matcher {
     pub fn new(mut req: Vec<u8>, mut mask: Vec<u8>) -> Matcher {
         debug_assert!(req.iter().zip(mask.iter()).all(|(&r, &m)| r & !m == 0));
-        let prefix_len = mask.iter()
+        let prefix_len = mask
+            .iter()
             .enumerate()
             .rev()
             .find(|&(_i, &m)| m != 0)

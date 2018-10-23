@@ -1384,6 +1384,68 @@ ge25519_pack(unsigned char r[32], const ge25519 *p) {
 	r[31] ^= ((parity[0] & 1) << 7);
 }
 
+/*
+	Timing safe memory compare
+*/
+static int
+ed25519_verify(const unsigned char *x, const unsigned char *y, size_t len) {
+	size_t differentbits = 0;
+	while (len--)
+		differentbits |= (*x++ ^ *y++);
+	return (int) (1 & ((differentbits - 1) >> 8));
+}
+
+static int
+ge25519_unpack_vartime(ge25519 *r, const unsigned char p[32]) {
+	const unsigned char zero[32] = {0};
+	const bignum25519 one = {1};
+	unsigned char parity = p[31] >> 7;
+	unsigned char check[32];
+	bignum25519 t, root, num, den, d3;
+
+	curve25519_expand(r->y, p);
+	curve25519_copy(r->z, one);
+	curve25519_square(num, r->y); /* x = y^2 */
+	curve25519_mul_const(den, num, ge25519_ecd); /* den = dy^2 */
+	curve25519_sub_reduce(num, num, r->z); /* x = y^1 - 1 */
+	curve25519_add(den, den, r->z); /* den = dy^2 + 1 */
+
+	/* Computation of sqrt(num/den) */
+	/* 1.: computation of num^((p-5)/8)*den^((7p-35)/8) = (num*den^7)^((p-5)/8) */
+	curve25519_square(t, den);
+	curve25519_mul(d3, t, den);
+	curve25519_square(r->x, d3);
+	curve25519_mul(r->x, r->x, den);
+	curve25519_mul(r->x, r->x, num);
+	curve25519_pow_two252m3(r->x, r->x);
+
+	/* 2. computation of r->x = num * den^3 * (num*den^7)^((p-5)/8) */
+	curve25519_mul(r->x, r->x, d3);
+	curve25519_mul(r->x, r->x, num);
+
+	/* 3. Check if either of the roots works: */
+	curve25519_square(t, r->x);
+	curve25519_mul(t, t, den);
+	curve25519_sub_reduce(root, t, num);
+	curve25519_contract(check, root);
+	if (!ed25519_verify(check, zero, 32)) {
+		curve25519_add_reduce(t, t, num);
+		curve25519_contract(check, t);
+		if (!ed25519_verify(check, zero, 32))
+			return 0;
+		curve25519_mul_const(r->x, r->x, ge25519_sqrtneg1);
+	}
+
+	curve25519_contract(check, r->x);
+	// Inverted from ge25519_unpack_negative_vartime
+	if ((check[0] & 1) != parity) {
+		curve25519_copy(t, r->x);
+		curve25519_neg(r->x, t);
+	}
+	curve25519_mul(r->t, r->x, r->y);
+	return 1;
+}
+
 
 /*
 	scalarmults
