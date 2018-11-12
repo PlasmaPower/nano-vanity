@@ -5,7 +5,7 @@ use std::sync::atomic;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 extern crate curve25519_dalek;
 use curve25519_dalek::constants::ED25519_BASEPOINT_TABLE;
@@ -480,12 +480,19 @@ fn main() {
         }));
     }
     if output_progress {
+        let start_time = Instant::now();
         let attempts = attempts_base;
         thread::spawn(move || loop {
             let attempts = attempts.load(atomic::Ordering::Relaxed);
             let estimated_percent =
                 100. * (attempts as f64) / estimated_attempts.to_f64().unwrap_or(f64::INFINITY);
-            eprint!("\rTried {} keys (~{:.2}%)", attempts, estimated_percent);
+            let runtime = start_time.elapsed().as_secs() as f64
+                + start_time.elapsed().subsec_nanos() as f64 * 1e-9;
+            let keys_per_second = (attempts as f64) / runtime;
+            eprint!(
+                "\rTried {} keys (~{:.2}%; {:.1} keys/s)",
+                attempts, estimated_percent, keys_per_second
+            );
             thread::sleep(Duration::from_millis(250));
         });
     }
