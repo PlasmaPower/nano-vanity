@@ -40,7 +40,7 @@ extern crate ocl;
 extern crate ocl_core;
 
 mod matcher;
-use matcher::{Matcher, GenerateKeyType};
+use matcher::{GenerateKeyType, Matcher};
 
 #[cfg(feature = "gpu")]
 mod gpu;
@@ -491,7 +491,7 @@ fn main() {
             let keys_per_second = (attempts as f64) / runtime;
             eprint!(
                 "\rTried {} keys (~{:.2}%; {:.1} keys/s)",
-                attempts, estimated_percent, keys_per_second
+                attempts, estimated_percent, keys_per_second,
             );
             thread::sleep(Duration::from_millis(250));
         });
