@@ -489,7 +489,7 @@ fn main() {
             let runtime = start_time.elapsed();
             let keys_per_second = (attempts as f64)
                 // simplify to .as_millis() when available
-                / (runtime.as_secs() as f64 + runtime.subsec_millis() as f64 * 1e-3);
+                / (runtime.as_secs() as f64 + runtime.subsec_millis() as f64 / 1000.0);
             eprint!(
                 "\rTried {} keys (~{:.2}%; {:.1} keys/s)",
                 attempts, estimated_percent, keys_per_second,
