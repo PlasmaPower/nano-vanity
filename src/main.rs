@@ -462,7 +462,7 @@ fn main() {
                 if output_progress {
                     params
                         .attempts
-                        .fetch_add(gpu_threads - 1, atomic::Ordering::Relaxed);
+                        .fetch_add(gpu_threads, atomic::Ordering::Relaxed);
                 }
                 if !found {
                     continue;
