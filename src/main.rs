@@ -486,9 +486,9 @@ fn main() {
             let attempts = attempts.load(atomic::Ordering::Relaxed);
             let estimated_percent =
                 100. * (attempts as f64) / estimated_attempts.to_f64().unwrap_or(f64::INFINITY);
-            let runtime = start_time.elapsed().as_secs() as f64
-                + start_time.elapsed().subsec_nanos() as f64 * 1e-9;
-            let keys_per_second = (attempts as f64) / runtime;
+            let runtime = start_time.elapsed();
+            let keys_per_second = (attempts as f64)
+                / (runtime.as_secs() as f64 + runtime.subsec_nanos() as f64 * 1e-9);
             eprint!(
                 "\rTried {} keys (~{:.2}%; {:.1} keys/s)",
                 attempts, estimated_percent, keys_per_second,
