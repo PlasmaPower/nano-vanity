@@ -488,7 +488,8 @@ fn main() {
                 100. * (attempts as f64) / estimated_attempts.to_f64().unwrap_or(f64::INFINITY);
             let runtime = start_time.elapsed();
             let keys_per_second = (attempts as f64)
-                / (runtime.as_secs() as f64 + runtime.subsec_nanos() as f64 * 1e-9);
+                // simplify to .as_millis() when available
+                / (runtime.as_secs() as f64 + runtime.subsec_millis() as f64 * 1e-3);
             eprint!(
                 "\rTried {} keys (~{:.2}%; {:.1} keys/s)",
                 attempts, estimated_percent, keys_per_second,
