@@ -5,7 +5,7 @@ use std::sync::atomic;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 extern crate curve25519_dalek;
 use curve25519_dalek::constants::ED25519_BASEPOINT_TABLE;
@@ -40,7 +40,7 @@ extern crate ocl;
 extern crate ocl_core;
 
 mod matcher;
-use matcher::{Matcher, GenerateKeyType};
+use matcher::{GenerateKeyType, Matcher};
 
 #[cfg(feature = "gpu")]
 mod gpu;
@@ -462,7 +462,7 @@ fn main() {
                 if output_progress {
                     params
                         .attempts
-                        .fetch_add(gpu_threads - 1, atomic::Ordering::Relaxed);
+                        .fetch_add(gpu_threads, atomic::Ordering::Relaxed);
                 }
                 if !found {
                     continue;
@@ -480,12 +480,20 @@ fn main() {
         }));
     }
     if output_progress {
+        let start_time = Instant::now();
         let attempts = attempts_base;
         thread::spawn(move || loop {
             let attempts = attempts.load(atomic::Ordering::Relaxed);
             let estimated_percent =
                 100. * (attempts as f64) / estimated_attempts.to_f64().unwrap_or(f64::INFINITY);
-            eprint!("\rTried {} keys (~{:.2}%)", attempts, estimated_percent);
+            let runtime = start_time.elapsed();
+            let keys_per_second = (attempts as f64)
+                // simplify to .as_millis() when available
+                / (runtime.as_secs() as f64 + runtime.subsec_millis() as f64 / 1000.0);
+            eprint!(
+                "\rTried {} keys (~{:.2}%; {:.1} keys/s)",
+                attempts, estimated_percent, keys_per_second,
+            );
             thread::sleep(Duration::from_millis(250));
         });
     }
