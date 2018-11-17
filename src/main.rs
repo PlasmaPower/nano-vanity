@@ -137,9 +137,6 @@ fn check_soln(params: &ThreadParams, key_material: [u8; 32]) -> bool {
             (&curvepoint + &offset).compress().to_bytes()
         }
     };
-    if params.output_progress {
-        params.attempts.fetch_add(1, atomic::Ordering::Relaxed);
-    }
     let matches = params.matcher.matches(&public_key);
     if matches {
         if params.output_progress {
