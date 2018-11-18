@@ -8,7 +8,7 @@ use ocl::ProQue;
 use ocl::Result;
 
 use derivation::GenerateKeyType;
-use matcher::Matcher;
+use pubkey_matcher::PubkeyMatcher;
 
 pub struct Gpu {
     kernel: ocl::Kernel,
@@ -21,7 +21,7 @@ impl Gpu {
         platform_idx: usize,
         device_idx: usize,
         threads: usize,
-        matcher: &Matcher,
+        matcher: &PubkeyMatcher,
         generate_key_type: GenerateKeyType,
     ) -> Result<Gpu> {
         let mut prog_bldr = ProgramBuilder::new();

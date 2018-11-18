@@ -34,8 +34,8 @@ extern crate ocl_core;
 mod derivation;
 use derivation::{pubkey_to_address, secret_to_pubkey, GenerateKeyType, ADDRESS_ALPHABET};
 
-mod matcher;
-use matcher::Matcher;
+mod pubkey_matcher;
+use pubkey_matcher::PubkeyMatcher;
 
 #[cfg(feature = "gpu")]
 mod gpu;
@@ -115,7 +115,7 @@ struct ThreadParams {
     attempts: Arc<AtomicUsize>,
     simple_output: bool,
     generate_key_type: GenerateKeyType,
-    matcher: Arc<Matcher>,
+    matcher: Arc<PubkeyMatcher>,
 }
 
 fn check_soln(params: &ThreadParams, key_material: [u8; 32]) -> bool {
@@ -300,7 +300,7 @@ fn main() {
             .chain(ext_pubkey_mask.into_iter())
             .collect();
     }
-    let matcher_base = Matcher::new(ext_pubkey_req, ext_pubkey_mask);
+    let matcher_base = PubkeyMatcher::new(ext_pubkey_req, ext_pubkey_mask);
     let estimated_attempts = matcher_base.estimated_attempts();
     let matcher_base = Arc::new(matcher_base);
     let limit = args

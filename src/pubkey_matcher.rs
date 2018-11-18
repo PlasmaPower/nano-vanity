@@ -4,14 +4,14 @@ use blake2::Blake2b;
 use digest::{Input, VariableOutput};
 use num_bigint::BigInt;
 
-pub struct Matcher {
+pub struct PubkeyMatcher {
     req: Vec<u8>,
     mask: Vec<u8>,
     prefix_len: usize,
 }
 
-impl Matcher {
-    pub fn new(mut req: Vec<u8>, mut mask: Vec<u8>) -> Matcher {
+impl PubkeyMatcher {
+    pub fn new(mut req: Vec<u8>, mut mask: Vec<u8>) -> PubkeyMatcher {
         debug_assert!(req.iter().zip(mask.iter()).all(|(&r, &m)| r & !m == 0));
         let prefix_len = mask
             .iter()
@@ -25,7 +25,7 @@ impl Matcher {
         mask.truncate(prefix_len);
         assert!(req.len() >= prefix_len);
         assert!(mask.len() >= prefix_len);
-        Matcher {
+        PubkeyMatcher {
             req: req,
             mask: mask,
             prefix_len,
