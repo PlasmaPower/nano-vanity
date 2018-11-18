@@ -72,13 +72,13 @@ fn pubkey_to_address(pubkey: [u8; 32]) -> String {
     check_hash.process(&pubkey as &[u8]);
     let mut check = [0u8; 5];
     check_hash.variable_result(&mut check).unwrap();
-    let mut ext_addr = pubkey.to_vec();
-    ext_addr.extend(check.iter().rev());
-    let mut ext_addr = BigInt::from_bytes_be(num_bigint::Sign::Plus, &ext_addr);
+    let mut ext_pubkey = pubkey.to_vec();
+    ext_pubkey.extend(check.iter().rev());
+    let mut ext_pubkey_int = BigInt::from_bytes_be(num_bigint::Sign::Plus, &ext_pubkey);
     for _ in 0..60 {
-        let n: BigInt = (&ext_addr) % 32; // lower 5 bits
+        let n: BigInt = (&ext_pubkey_int) % 32; // lower 5 bits
         reverse_chars.push(ACCOUNT_LOOKUP[n.to_usize().unwrap()]);
-        ext_addr = ext_addr >> 5;
+        ext_pubkey_int = ext_pubkey_int >> 5;
     }
     reverse_chars.extend(b"_brx"); // xrb_ reversed
     reverse_chars
