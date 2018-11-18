@@ -1,17 +1,8 @@
 use std::cmp;
 
 use blake2::Blake2b;
-use curve25519_dalek::edwards::EdwardsPoint;
 use digest::{Input, VariableOutput};
 use num_bigint::BigInt;
-
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub enum GenerateKeyType {
-    PrivateKey,
-    Seed,
-    /// Parameter is public offset
-    ExtendedPrivateKey(EdwardsPoint),
-}
 
 pub struct Matcher {
     req: Vec<u8>,

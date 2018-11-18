@@ -8,20 +8,12 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 extern crate curve25519_dalek;
-use curve25519_dalek::constants::ED25519_BASEPOINT_TABLE;
 use curve25519_dalek::edwards::CompressedEdwardsY;
-use curve25519_dalek::scalar::Scalar as CurveScalar;
-
-extern crate ed25519_dalek;
-use ed25519_dalek::{PublicKey, SecretKey};
 
 extern crate blake2;
-use blake2::Blake2b;
-
-extern crate digest;
-use digest::{Input, VariableOutput};
-
 extern crate clap;
+extern crate digest;
+extern crate ed25519_dalek;
 extern crate hex;
 extern crate num_cpus;
 
@@ -39,11 +31,11 @@ extern crate ocl;
 #[cfg(feature = "gpu")]
 extern crate ocl_core;
 
-mod address;
-use address::{pubkey_to_address, ADDRESS_ALPHABET};
+mod derivation;
+use derivation::{pubkey_to_address, secret_to_pubkey, GenerateKeyType, ADDRESS_ALPHABET};
 
 mod matcher;
-use matcher::{GenerateKeyType, Matcher};
+use matcher::Matcher;
 
 #[cfg(feature = "gpu")]
 mod gpu;
@@ -127,27 +119,7 @@ struct ThreadParams {
 }
 
 fn check_soln(params: &ThreadParams, key_material: [u8; 32]) -> bool {
-    fn sec_to_pub(sec: &[u8; 32]) -> [u8; 32] {
-        let secret_key = SecretKey::from_bytes(sec).unwrap();
-        let public_key = PublicKey::from_secret::<Blake2b>(&secret_key);
-        public_key.to_bytes()
-    }
-    let public_key = match params.generate_key_type {
-        GenerateKeyType::PrivateKey => sec_to_pub(&key_material),
-        GenerateKeyType::Seed => {
-            let mut private_key = [0u8; 32];
-            let mut hasher = Blake2b::new(32).unwrap();
-            hasher.process(&key_material);
-            hasher.process(&[0, 0, 0, 0]);
-            hasher.variable_result(&mut private_key).unwrap();
-            sec_to_pub(&private_key)
-        }
-        GenerateKeyType::ExtendedPrivateKey(offset) => {
-            let scalar = CurveScalar::from_bytes_mod_order(key_material);
-            let curvepoint = &scalar * &ED25519_BASEPOINT_TABLE;
-            (&curvepoint + &offset).compress().to_bytes()
-        }
-    };
+    let public_key = secret_to_pubkey(key_material, params.generate_key_type);
     let matches = params.matcher.matches(&public_key);
     if matches {
         if params.output_progress {

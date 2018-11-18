@@ -7,7 +7,8 @@ use ocl::Platform;
 use ocl::ProQue;
 use ocl::Result;
 
-use matcher::{GenerateKeyType, Matcher};
+use derivation::GenerateKeyType;
+use matcher::Matcher;
 
 pub struct Gpu {
     kernel: ocl::Kernel,
