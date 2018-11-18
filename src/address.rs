@@ -12,7 +12,7 @@ use num_bigint::BigInt;
 extern crate num_traits;
 use num_traits::ToPrimitive;
 
-pub const ACCOUNT_LOOKUP: &[u8] = b"13456789abcdefghijkmnopqrstuwxyz";
+pub const ADDRESS_ALPHABET: &[u8] = b"13456789abcdefghijkmnopqrstuwxyz";
 
 /// Only used when outputting addresses to user. Not for speed.
 pub fn pubkey_to_address(pubkey: [u8; 32]) -> String {
@@ -26,7 +26,7 @@ pub fn pubkey_to_address(pubkey: [u8; 32]) -> String {
     let mut ext_pubkey_int = BigInt::from_bytes_be(num_bigint::Sign::Plus, &ext_pubkey);
     for _ in 0..60 {
         let n: BigInt = (&ext_pubkey_int) % 32; // lower 5 bits
-        reverse_chars.push(ACCOUNT_LOOKUP[n.to_usize().unwrap()]);
+        reverse_chars.push(ADDRESS_ALPHABET[n.to_usize().unwrap()]);
         ext_pubkey_int = ext_pubkey_int >> 5;
     }
     reverse_chars.extend(b"_brx"); // xrb_ reversed

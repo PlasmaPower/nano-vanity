@@ -40,7 +40,7 @@ extern crate ocl;
 extern crate ocl_core;
 
 mod address;
-use address::{pubkey_to_address, ACCOUNT_LOOKUP};
+use address::{pubkey_to_address, ADDRESS_ALPHABET};
 
 mod matcher;
 use matcher::{GenerateKeyType, Matcher};
@@ -72,7 +72,7 @@ fn char_byte_mask(ch: char) -> (u8, u8) {
     } else if ch == '#' {
         (0, (1 << 5) - (1 << 3))
     } else {
-        let lookup = ACCOUNT_LOOKUP.iter().position(|&c| (c as char) == ch);
+        let lookup = ADDRESS_ALPHABET.iter().position(|&c| (c as char) == ch);
         match lookup {
             Some(p) => (p as u8, (1 << 5) - 1),
             None => {
