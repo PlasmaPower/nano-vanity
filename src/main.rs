@@ -39,6 +39,9 @@ extern crate ocl;
 #[cfg(feature = "gpu")]
 extern crate ocl_core;
 
+mod address;
+use address::{pubkey_to_address, ACCOUNT_LOOKUP};
+
 mod matcher;
 use matcher::{GenerateKeyType, Matcher};
 
@@ -61,31 +64,6 @@ impl Gpu {
     pub fn compute(&mut self, _: &mut [u8], _: &[u8]) -> Result<bool, String> {
         unreachable!()
     }
-}
-
-const ACCOUNT_LOOKUP: &[u8] = b"13456789abcdefghijkmnopqrstuwxyz";
-
-/// Only used when outputting addresses to user. Not for speed.
-fn pubkey_to_address(pubkey: [u8; 32]) -> String {
-    let mut reverse_chars = Vec::<u8>::new();
-    let mut check_hash = Blake2b::new(5).unwrap();
-    check_hash.process(&pubkey as &[u8]);
-    let mut check = [0u8; 5];
-    check_hash.variable_result(&mut check).unwrap();
-    let mut ext_pubkey = pubkey.to_vec();
-    ext_pubkey.extend(check.iter().rev());
-    let mut ext_pubkey_int = BigInt::from_bytes_be(num_bigint::Sign::Plus, &ext_pubkey);
-    for _ in 0..60 {
-        let n: BigInt = (&ext_pubkey_int) % 32; // lower 5 bits
-        reverse_chars.push(ACCOUNT_LOOKUP[n.to_usize().unwrap()]);
-        ext_pubkey_int = ext_pubkey_int >> 5;
-    }
-    reverse_chars.extend(b"_brx"); // xrb_ reversed
-    reverse_chars
-        .iter()
-        .rev()
-        .map(|&c| c as char)
-        .collect::<String>()
 }
 
 fn char_byte_mask(ch: char) -> (u8, u8) {
