@@ -83,6 +83,39 @@ fn char_byte_mask(ch: char) -> (u8, u8) {
     }
 }
 
+fn print_solution(
+    secret_key_material: [u8; 32],
+    secret_key_type: GenerateKeyType,
+    public_key: [u8; 32],
+    simple_output: bool,
+) {
+    if simple_output {
+        println!(
+            "{} {}",
+            hex::encode_upper(&secret_key_material as &[u8]),
+            pubkey_to_address(public_key),
+        );
+    } else {
+        match secret_key_type {
+            GenerateKeyType::PrivateKey => println!(
+                "Found matching account!\nPrivate Key: {}\nAddress:     {}",
+                hex::encode_upper(&secret_key_material as &[u8]),
+                pubkey_to_address(public_key),
+            ),
+            GenerateKeyType::Seed => println!(
+                "Found matching account!\nSeed:    {}\nAddress: {}",
+                hex::encode_upper(&secret_key_material as &[u8]),
+                pubkey_to_address(public_key),
+            ),
+            GenerateKeyType::ExtendedPrivateKey(_) => println!(
+                "Found matching account!\nExtended private key: {}\nAddress:              {}",
+                hex::encode_upper(&secret_key_material as &[u8]),
+                pubkey_to_address(public_key),
+            ),
+        }
+    }
+}
+
 struct ThreadParams {
     limit: usize,
     found_n: Arc<AtomicUsize>,
@@ -121,37 +154,12 @@ fn check_soln(params: &ThreadParams, key_material: [u8; 32]) -> bool {
             params.attempts.store(0, atomic::Ordering::Relaxed);
             eprintln!("");
         }
-        if params.simple_output {
-            println!(
-                "{} {}",
-                hex::encode_upper(&key_material as &[u8]),
-                pubkey_to_address(public_key),
-            );
-        } else {
-            match params.generate_key_type {
-                GenerateKeyType::PrivateKey => {
-                    println!(
-                        "Found matching account!\nPrivate Key: {}\nAddress:     {}",
-                        hex::encode_upper(&key_material as &[u8]),
-                        pubkey_to_address(public_key),
-                    );
-                }
-                GenerateKeyType::Seed => {
-                    println!(
-                        "Found matching account!\nSeed:    {}\nAddress: {}",
-                        hex::encode_upper(&key_material as &[u8]),
-                        pubkey_to_address(public_key),
-                    );
-                }
-                GenerateKeyType::ExtendedPrivateKey(_) => {
-                    println!(
-                        "Found matching account!\nExtended private key: {}\nAddress:              {}",
-                        hex::encode_upper(&key_material as &[u8]),
-                        pubkey_to_address(public_key),
-                    );
-                }
-            }
-        }
+        print_solution(
+            key_material,
+            params.generate_key_type,
+            public_key,
+            params.simple_output,
+        );
         if params.limit != 0
             && params.found_n.fetch_add(1, atomic::Ordering::Relaxed) + 1 >= params.limit
         {
