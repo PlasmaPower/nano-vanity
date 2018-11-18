@@ -78,7 +78,7 @@ impl Gpu {
         req.write(matcher.req()).enq()?;
         mask.write(matcher.mask()).enq()?;
         result.write(&[0u8; 32] as &[u8]).enq()?;
-        let gen_key_ty_code: u8 = match generate_key_type {
+        let gen_key_type_code: u8 = match generate_key_type {
             GenerateKeyType::PrivateKey => 0,
             GenerateKeyType::Seed => 1,
             GenerateKeyType::ExtendedPrivateKey(offset) => {
@@ -96,7 +96,7 @@ impl Gpu {
             .arg(&req)
             .arg(&mask)
             .arg(matcher.prefix_len() as u8)
-            .arg(gen_key_ty_code)
+            .arg(gen_key_type_code)
             .arg(&public_offset)
             .build()?;
 
