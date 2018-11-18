@@ -66,7 +66,7 @@ impl Gpu {
 const ACCOUNT_LOOKUP: &[u8] = b"13456789abcdefghijkmnopqrstuwxyz";
 
 /// Only used when outputting addresses to user. Not for speed.
-fn account_encode(pubkey: [u8; 32]) -> String {
+fn pubkey_to_address(pubkey: [u8; 32]) -> String {
     let mut reverse_chars = Vec::<u8>::new();
     let mut check_hash = Blake2b::new(5).unwrap();
     check_hash.process(&pubkey as &[u8]);
@@ -147,29 +147,29 @@ fn check_soln(params: &ThreadParams, key_material: [u8; 32]) -> bool {
             println!(
                 "{} {}",
                 hex::encode_upper(&key_material as &[u8]),
-                account_encode(public_key),
+                pubkey_to_address(public_key),
             );
         } else {
             match params.generate_key_type {
                 GenerateKeyType::PrivateKey => {
                     println!(
-                        "Found matching account!\nPrivate Key: {}\nAccount:     {}",
+                        "Found matching account!\nPrivate Key: {}\nAddress:     {}",
                         hex::encode_upper(&key_material as &[u8]),
-                        account_encode(public_key),
+                        pubkey_to_address(public_key),
                     );
                 }
                 GenerateKeyType::Seed => {
                     println!(
-                        "Found matching account!\nSeed:    {}\nAccount: {}",
+                        "Found matching account!\nSeed:    {}\nAddress: {}",
                         hex::encode_upper(&key_material as &[u8]),
-                        account_encode(public_key),
+                        pubkey_to_address(public_key),
                     );
                 }
                 GenerateKeyType::ExtendedPrivateKey(_) => {
                     println!(
-                        "Found matching account!\nExtended private key: {}\nAccount:              {}",
+                        "Found matching account!\nExtended private key: {}\nAddress:              {}",
                         hex::encode_upper(&key_material as &[u8]),
-                        account_encode(public_key),
+                        pubkey_to_address(public_key),
                     );
                 }
             }
