@@ -8,20 +8,12 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 extern crate curve25519_dalek;
-use curve25519_dalek::constants::ED25519_BASEPOINT_TABLE;
 use curve25519_dalek::edwards::CompressedEdwardsY;
-use curve25519_dalek::scalar::Scalar as CurveScalar;
-
-extern crate ed25519_dalek;
-use ed25519_dalek::{PublicKey, SecretKey};
 
 extern crate blake2;
-use blake2::Blake2b;
-
-extern crate digest;
-use digest::{Input, VariableOutput};
-
 extern crate clap;
+extern crate digest;
+extern crate ed25519_dalek;
 extern crate hex;
 extern crate num_cpus;
 
@@ -39,8 +31,11 @@ extern crate ocl;
 #[cfg(feature = "gpu")]
 extern crate ocl_core;
 
-mod matcher;
-use matcher::{GenerateKeyType, Matcher};
+mod derivation;
+use derivation::{pubkey_to_address, secret_to_pubkey, GenerateKeyType, ADDRESS_ALPHABET};
+
+mod pubkey_matcher;
+use pubkey_matcher::PubkeyMatcher;
 
 #[cfg(feature = "gpu")]
 mod gpu;
@@ -63,44 +58,52 @@ impl Gpu {
     }
 }
 
-const ACCOUNT_LOOKUP: &[u8] = b"13456789abcdefghijkmnopqrstuwxyz";
-
-/// Only used when outputting addresses to user. Not for speed.
-fn account_encode(pubkey: [u8; 32]) -> String {
-    let mut reverse_chars = Vec::<u8>::new();
-    let mut check_hash = Blake2b::new(5).unwrap();
-    check_hash.process(&pubkey as &[u8]);
-    let mut check = [0u8; 5];
-    check_hash.variable_result(&mut check).unwrap();
-    let mut ext_addr = pubkey.to_vec();
-    ext_addr.extend(check.iter().rev());
-    let mut ext_addr = BigInt::from_bytes_be(num_bigint::Sign::Plus, &ext_addr);
-    for _ in 0..60 {
-        let n: BigInt = (&ext_addr) % 32; // lower 5 bits
-        reverse_chars.push(ACCOUNT_LOOKUP[n.to_usize().unwrap()]);
-        ext_addr = ext_addr >> 5;
-    }
-    reverse_chars.extend(b"_brx"); // xrb_ reversed
-    reverse_chars
-        .iter()
-        .rev()
-        .map(|&c| c as char)
-        .collect::<String>()
-}
-
 fn char_byte_mask(ch: char) -> (u8, u8) {
     if ch == '.' || ch == '*' {
         (0, 0)
     } else if ch == '#' {
         (0, (1 << 5) - (1 << 3))
     } else {
-        let lookup = ACCOUNT_LOOKUP.iter().position(|&c| (c as char) == ch);
+        let lookup = ADDRESS_ALPHABET.iter().position(|&c| (c as char) == ch);
         match lookup {
             Some(p) => (p as u8, (1 << 5) - 1),
             None => {
                 eprintln!("Invalid character in prefix: {:?}", ch);
                 process::exit(1);
             }
+        }
+    }
+}
+
+fn print_solution(
+    secret_key_material: [u8; 32],
+    secret_key_type: GenerateKeyType,
+    public_key: [u8; 32],
+    simple_output: bool,
+) {
+    if simple_output {
+        println!(
+            "{} {}",
+            hex::encode_upper(&secret_key_material as &[u8]),
+            pubkey_to_address(public_key),
+        );
+    } else {
+        match secret_key_type {
+            GenerateKeyType::PrivateKey => println!(
+                "Found matching account!\nPrivate Key: {}\nAddress:     {}",
+                hex::encode_upper(&secret_key_material as &[u8]),
+                pubkey_to_address(public_key),
+            ),
+            GenerateKeyType::Seed => println!(
+                "Found matching account!\nSeed:    {}\nAddress: {}",
+                hex::encode_upper(&secret_key_material as &[u8]),
+                pubkey_to_address(public_key),
+            ),
+            GenerateKeyType::ExtendedPrivateKey(_) => println!(
+                "Found matching account!\nExtended private key: {}\nAddress:              {}",
+                hex::encode_upper(&secret_key_material as &[u8]),
+                pubkey_to_address(public_key),
+            ),
         }
     }
 }
@@ -112,68 +115,23 @@ struct ThreadParams {
     attempts: Arc<AtomicUsize>,
     simple_output: bool,
     generate_key_type: GenerateKeyType,
-    matcher: Arc<Matcher>,
+    matcher: Arc<PubkeyMatcher>,
 }
 
-fn check_soln(params: &ThreadParams, key_material: [u8; 32]) -> bool {
-    fn sec_to_pub(sec: &[u8; 32]) -> [u8; 32] {
-        let secret_key = SecretKey::from_bytes(sec).unwrap();
-        let public_key = PublicKey::from_secret::<Blake2b>(&secret_key);
-        public_key.to_bytes()
-    }
-    let public_key = match params.generate_key_type {
-        GenerateKeyType::PrivateKey => sec_to_pub(&key_material),
-        GenerateKeyType::Seed => {
-            let mut private_key = [0u8; 32];
-            let mut hasher = Blake2b::new(32).unwrap();
-            hasher.process(&key_material);
-            hasher.process(&[0, 0, 0, 0]);
-            hasher.variable_result(&mut private_key).unwrap();
-            sec_to_pub(&private_key)
-        }
-        GenerateKeyType::ExtendedPrivateKey(offset) => {
-            let scalar = CurveScalar::from_bytes_mod_order(key_material);
-            let curvepoint = &scalar * &ED25519_BASEPOINT_TABLE;
-            (&curvepoint + &offset).compress().to_bytes()
-        }
-    };
+fn check_solution(params: &ThreadParams, key_material: [u8; 32]) -> bool {
+    let public_key = secret_to_pubkey(key_material, params.generate_key_type);
     let matches = params.matcher.matches(&public_key);
     if matches {
         if params.output_progress {
             params.attempts.store(0, atomic::Ordering::Relaxed);
             eprintln!("");
         }
-        if params.simple_output {
-            println!(
-                "{} {}",
-                hex::encode_upper(&key_material as &[u8]),
-                account_encode(public_key),
-            );
-        } else {
-            match params.generate_key_type {
-                GenerateKeyType::PrivateKey => {
-                    println!(
-                        "Found matching account!\nPrivate Key: {}\nAccount:     {}",
-                        hex::encode_upper(&key_material as &[u8]),
-                        account_encode(public_key),
-                    );
-                }
-                GenerateKeyType::Seed => {
-                    println!(
-                        "Found matching account!\nSeed:    {}\nAccount: {}",
-                        hex::encode_upper(&key_material as &[u8]),
-                        account_encode(public_key),
-                    );
-                }
-                GenerateKeyType::ExtendedPrivateKey(_) => {
-                    println!(
-                        "Found matching account!\nExtended private key: {}\nAccount:              {}",
-                        hex::encode_upper(&key_material as &[u8]),
-                        account_encode(public_key),
-                    );
-                }
-            }
-        }
+        print_solution(
+            key_material,
+            params.generate_key_type,
+            public_key,
+            params.simple_output,
+        );
         if params.limit != 0
             && params.found_n.fetch_add(1, atomic::Ordering::Relaxed) + 1 >= params.limit
         {
@@ -342,7 +300,7 @@ fn main() {
             .chain(ext_pubkey_mask.into_iter())
             .collect();
     }
-    let matcher_base = Matcher::new(ext_pubkey_req, ext_pubkey_mask);
+    let matcher_base = PubkeyMatcher::new(ext_pubkey_req, ext_pubkey_mask);
     let estimated_attempts = matcher_base.estimated_attempts();
     let matcher_base = Arc::new(matcher_base);
     let limit = args
@@ -399,7 +357,7 @@ fn main() {
             attempts: attempts_base.clone(),
         };
         thread_handles.push(thread::spawn(move || loop {
-            if check_soln(&params, key_or_seed) {
+            if check_solution(&params, key_or_seed) {
                 rng.fill_bytes(&mut key_or_seed);
             } else {
                 if output_progress {
@@ -464,7 +422,7 @@ fn main() {
                 if !found {
                     continue;
                 }
-                if !check_soln(&params, found_private_key) {
+                if !check_solution(&params, found_private_key) {
                     eprintln!(
                         "GPU returned non-matching solution: {}",
                         hex::encode_upper(&found_private_key)
