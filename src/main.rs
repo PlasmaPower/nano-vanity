@@ -118,7 +118,7 @@ struct ThreadParams {
     matcher: Arc<PubkeyMatcher>,
 }
 
-fn check_soln(params: &ThreadParams, key_material: [u8; 32]) -> bool {
+fn check_solution(params: &ThreadParams, key_material: [u8; 32]) -> bool {
     let public_key = secret_to_pubkey(key_material, params.generate_key_type);
     let matches = params.matcher.matches(&public_key);
     if matches {
@@ -357,7 +357,7 @@ fn main() {
             attempts: attempts_base.clone(),
         };
         thread_handles.push(thread::spawn(move || loop {
-            if check_soln(&params, key_or_seed) {
+            if check_solution(&params, key_or_seed) {
                 rng.fill_bytes(&mut key_or_seed);
             } else {
                 if output_progress {
@@ -422,7 +422,7 @@ fn main() {
                 if !found {
                     continue;
                 }
-                if !check_soln(&params, found_private_key) {
+                if !check_solution(&params, found_private_key) {
                     eprintln!(
                         "GPU returned non-matching solution: {}",
                         hex::encode_upper(&found_private_key)
