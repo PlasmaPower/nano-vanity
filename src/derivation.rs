@@ -29,10 +29,13 @@ pub fn secret_to_pubkey(key_material: [u8; 32], generate_key_type: GenerateKeyTy
     match generate_key_type {
         GenerateKeyType::PrivateKey => ed25519_privkey_to_pubkey(&key_material),
         GenerateKeyType::Seed => {
+            // Simple address derivation as defined in https://github.com/marvinroger/nanocurrency-js/blob/v2.0.4/src/keys.ts#L40
+            // HD keys are not yet standardized (https://github.com/nanocurrency/raiblocks/issues/601)
+            let address_index = [0, 0, 0, 0];
             let mut private_key = [0u8; 32];
             let mut hasher = Blake2b::new(32).unwrap();
             hasher.process(&key_material);
-            hasher.process(&[0, 0, 0, 0]);
+            hasher.process(&address_index);
             hasher.variable_result(&mut private_key).unwrap();
             ed25519_privkey_to_pubkey(&private_key)
         }
