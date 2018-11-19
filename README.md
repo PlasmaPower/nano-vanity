@@ -37,7 +37,7 @@ To explain the difference between seeds and private keys:
 - Seeds plus an index (1st key, 2nd key, etc) generate a private key.
   Currently, this project will always use the first index (index 0).
 - A private key generates a public key.
-- Accounts are another way of writing public keys.
+- Addresses are another way of writing public keys.
 
 ## Wildcards
 
