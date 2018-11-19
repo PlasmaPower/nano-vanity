@@ -19,7 +19,7 @@ pub enum GenerateKeyType {
     ExtendedPrivateKey(EdwardsPoint),
 }
 
-fn ed25519_secret_to_pubkey(sec: &[u8; 32]) -> [u8; 32] {
+fn ed25519_privkey_to_pubkey(sec: &[u8; 32]) -> [u8; 32] {
     let secret_key = SecretKey::from_bytes(sec).unwrap();
     let public_key = PublicKey::from_secret::<Blake2b>(&secret_key);
     public_key.to_bytes()
@@ -27,14 +27,14 @@ fn ed25519_secret_to_pubkey(sec: &[u8; 32]) -> [u8; 32] {
 
 pub fn secret_to_pubkey(key_material: [u8; 32], generate_key_type: GenerateKeyType) -> [u8; 32] {
     match generate_key_type {
-        GenerateKeyType::PrivateKey => ed25519_secret_to_pubkey(&key_material),
+        GenerateKeyType::PrivateKey => ed25519_privkey_to_pubkey(&key_material),
         GenerateKeyType::Seed => {
             let mut private_key = [0u8; 32];
             let mut hasher = Blake2b::new(32).unwrap();
             hasher.process(&key_material);
             hasher.process(&[0, 0, 0, 0]);
             hasher.variable_result(&mut private_key).unwrap();
-            ed25519_secret_to_pubkey(&private_key)
+            ed25519_privkey_to_pubkey(&private_key)
         }
         GenerateKeyType::ExtendedPrivateKey(offset) => {
             let scalar = CurveScalar::from_bytes_mod_order(key_material);
@@ -79,8 +79,8 @@ mod tests {
         // Secret: 847B0EC950A7F5B6AD6C3A1AA5A5B940608435B59F201662D13A6D11F65F7DA6
         // Pubkey: D741569435DC9698AAE5212A437F5DEDA76EFC4288CA3FCDE9604190A861FE07
         // Address: xrb_3ot3ctc5dq6pm4ogcabcafzouuf9fuy6748c9z8ykr43k4n85zi9zec5bxnz
-        let mut secret = [0u8; 32];
-        secret.copy_from_slice(
+        let mut privkey = [0u8; 32];
+        privkey.copy_from_slice(
             &hex::decode("847B0EC950A7F5B6AD6C3A1AA5A5B940608435B59F201662D13A6D11F65F7DA6")
                 .unwrap(),
         );
@@ -89,7 +89,7 @@ mod tests {
             &hex::decode("D741569435DC9698AAE5212A437F5DEDA76EFC4288CA3FCDE9604190A861FE07")
                 .unwrap(),
         );
-        assert_eq!(ed25519_secret_to_pubkey(&secret), expected_pubkey);
+        assert_eq!(ed25519_privkey_to_pubkey(&privkey), expected_pubkey);
     }
 
     #[test]
