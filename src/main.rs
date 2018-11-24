@@ -3,7 +3,7 @@ use std::iter;
 use std::process;
 use std::sync::atomic;
 use std::sync::atomic::AtomicUsize;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -113,9 +113,18 @@ struct ThreadParams {
     found_n: Arc<AtomicUsize>,
     output_progress: bool,
     attempts: Arc<AtomicUsize>,
+    start_time: Arc<RwLock<Instant>>,
     simple_output: bool,
     generate_key_type: GenerateKeyType,
     matcher: Arc<PubkeyMatcher>,
+}
+
+fn reset_current_attempt_stats(params: &ThreadParams) {
+    params.attempts.store(0, atomic::Ordering::Relaxed);
+    {
+        let mut locked_start_time = params.start_time.write().unwrap();
+        *locked_start_time = Instant::now();
+    }
 }
 
 fn check_solution(params: &ThreadParams, key_material: [u8; 32]) -> bool {
@@ -123,7 +132,7 @@ fn check_solution(params: &ThreadParams, key_material: [u8; 32]) -> bool {
     let matches = params.matcher.matches(&public_key);
     if matches {
         if params.output_progress {
-            params.attempts.store(0, atomic::Ordering::Relaxed);
+            reset_current_attempt_stats(params);
             eprintln!("");
         }
         print_solution(
@@ -310,6 +319,7 @@ fn main() {
         .expect("Failed to parse limit option");
     let found_n_base = Arc::new(AtomicUsize::new(0));
     let attempts_base = Arc::new(AtomicUsize::new(0));
+    let start_time_base = Arc::new(RwLock::new(Instant::now()));
     let output_progress = !args.is_present("no_progress");
     let simple_output = args.is_present("simple_output");
     let generate_seed = args.is_present("generate_seed");
@@ -355,6 +365,7 @@ fn main() {
             matcher: matcher_base.clone(),
             found_n: found_n_base.clone(),
             attempts: attempts_base.clone(),
+            start_time: start_time_base.clone(),
         };
         thread_handles.push(thread::spawn(move || loop {
             if check_solution(&params, key_or_seed) {
@@ -398,6 +409,7 @@ fn main() {
             matcher: matcher_base.clone(),
             found_n: found_n_base.clone(),
             attempts: attempts_base.clone(),
+            start_time: start_time_base.clone(),
         };
         let mut gpu = Gpu::new(
             gpu_platform,
@@ -435,13 +447,17 @@ fn main() {
         }));
     }
     if output_progress {
-        let start_time = Instant::now();
         let attempts = attempts_base.clone();
+        let start_time = start_time_base.clone();
         thread::spawn(move || loop {
             let attempts = attempts.load(atomic::Ordering::Relaxed);
             let estimated_percent =
                 100. * (attempts as f64) / estimated_attempts.to_f64().unwrap_or(f64::INFINITY);
-            let runtime = start_time.elapsed();
+            let runtime;
+            {
+                let locked_start_time = start_time.read();
+                runtime = locked_start_time.unwrap().elapsed();
+            }
             let keys_per_second = (attempts as f64)
                 // simplify to .as_millis() when available
                 / (runtime.as_secs() as f64 + runtime.subsec_millis() as f64 / 1000.0);
