@@ -123,7 +123,6 @@ fn check_solution(params: &ThreadParams, key_material: [u8; 32]) -> bool {
     let matches = params.matcher.matches(&public_key);
     if matches {
         if params.output_progress {
-            params.attempts.store(0, atomic::Ordering::Relaxed);
             eprintln!("");
         }
         print_solution(
