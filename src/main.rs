@@ -436,7 +436,7 @@ fn main() {
     }
     if output_progress {
         let start_time = Instant::now();
-        let attempts = attempts_base;
+        let attempts = attempts_base.clone();
         thread::spawn(move || loop {
             let attempts = attempts.load(atomic::Ordering::Relaxed);
             let estimated_percent =
