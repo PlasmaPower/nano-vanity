@@ -462,7 +462,7 @@ fn main() {
                 // simplify to .as_millis() when available
                 / (runtime.as_secs() as f64 + runtime.subsec_millis() as f64 / 1000.0);
             eprint!(
-                "\rTried {} keys (~{:.2}%; {:.1} keys/s)",
+                "\rTried {} keys (~{:.2}%; {:.0} keys/s)",
                 attempts, estimated_percent, keys_per_second,
             );
             thread::sleep(Duration::from_millis(250));
