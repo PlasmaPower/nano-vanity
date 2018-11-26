@@ -28,8 +28,6 @@ use num_traits::{ToPrimitive, Zero};
 
 #[cfg(feature = "gpu")]
 extern crate ocl;
-#[cfg(feature = "gpu")]
-extern crate ocl_core;
 
 mod derivation;
 use derivation::{pubkey_to_address, secret_to_pubkey, GenerateKeyType, ADDRESS_ALPHABET};
