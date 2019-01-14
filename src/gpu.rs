@@ -21,6 +21,7 @@ impl Gpu {
         platform_idx: usize,
         device_idx: usize,
         threads: usize,
+        local_work_size: usize,
         matcher: &PubkeyMatcher,
         generate_key_type: GenerateKeyType,
     ) -> Result<Gpu> {
@@ -92,6 +93,7 @@ impl Gpu {
         let kernel = pro_que
             .kernel_builder("generate_pubkey")
             .global_work_size(threads)
+            .local_work_size(local_work_size)
             .arg(&result)
             .arg(&key_root)
             .arg(&req)
