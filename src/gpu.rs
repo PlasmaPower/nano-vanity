@@ -41,7 +41,8 @@ impl Gpu {
                 "Platform index {} too large (max {})",
                 platform_idx,
                 platforms.len() - 1
-            ).into());
+            )
+            .into());
         }
         let mut pro_que = ProQue::builder()
             .prog_bldr(prog_bldr)

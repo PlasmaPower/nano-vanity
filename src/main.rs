@@ -45,7 +45,13 @@ struct Gpu;
 
 #[cfg(not(feature = "gpu"))]
 impl Gpu {
-    pub fn new(_: usize, _: usize, _: usize, _: &PubkeyMatcher, _: GenerateKeyType) -> Result<Gpu, String> {
+    pub fn new(
+        _: usize,
+        _: usize,
+        _: usize,
+        _: &PubkeyMatcher,
+        _: GenerateKeyType,
+    ) -> Result<Gpu, String> {
         eprintln!("GPU support has been disabled at compile time.");
         eprintln!("Rebuild with \"--features gpu\" to enable GPU support.");
         process::exit(1);
@@ -391,12 +397,10 @@ fn main() {
             .unwrap()
             .parse()
             .expect("Failed to parse GPU threads option");
-        let gpu_local_work_size = args
-            .value_of("gpu_local_work_size")
-            .map(|s| s
-                .parse()
+        let gpu_local_work_size = args.value_of("gpu_local_work_size").map(|s| {
+            s.parse()
                 .expect("Failed to parse GPU local work size option")
-            );
+        });
         let mut key_base = [0u8; 32];
         let params = ThreadParams {
             limit,
@@ -414,7 +418,8 @@ fn main() {
             gpu_local_work_size,
             &params.matcher,
             gen_key_ty,
-        ).unwrap();
+        )
+        .unwrap();
         gpu_thread = Some(thread::spawn(move || {
             let mut rng = OsRng::new().expect("Failed to get RNG for seed");
             let mut found_private_key = [0u8; 32];
