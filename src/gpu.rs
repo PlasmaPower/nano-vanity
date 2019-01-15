@@ -21,7 +21,7 @@ impl Gpu {
         platform_idx: usize,
         device_idx: usize,
         threads: usize,
-        local_work_size: usize,
+        local_work_size: Option<usize>,
         matcher: &PubkeyMatcher,
         generate_key_type: GenerateKeyType,
     ) -> Result<Gpu> {
@@ -90,18 +90,22 @@ impl Gpu {
             }
         };
 
-        let kernel = pro_que
-            .kernel_builder("generate_pubkey")
-            .global_work_size(threads)
-            .local_work_size(local_work_size)
-            .arg(&result)
-            .arg(&key_root)
-            .arg(&req)
-            .arg(&mask)
-            .arg(matcher.prefix_len() as u8)
-            .arg(gen_key_type_code)
-            .arg(&public_offset)
-            .build()?;
+        let kernel = {
+            let mut kernel_builder = pro_que.kernel_builder("generate_pubkey");
+            kernel_builder
+                .global_work_size(threads)
+                .arg(&result)
+                .arg(&key_root)
+                .arg(&req)
+                .arg(&mask)
+                .arg(matcher.prefix_len() as u8)
+                .arg(gen_key_type_code)
+                .arg(&public_offset);
+            if let Some(local_work_size) = local_work_size {
+                kernel_builder.local_work_size(local_work_size);
+            }
+            kernel_builder.build()?
+        };
 
         Ok(Gpu {
             kernel,

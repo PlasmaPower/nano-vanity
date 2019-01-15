@@ -186,7 +186,6 @@ fn main() {
             clap::Arg::with_name("gpu_local_work_size")
                 .long("gpu-local-work-size")
                 .value_name("N")
-                .default_value("1")
                 .help("The GPU local work size. Increasing it may increase performance. For advanced users only."),
         ).arg(
             clap::Arg::with_name("no_progress")
@@ -394,9 +393,10 @@ fn main() {
             .expect("Failed to parse GPU threads option");
         let gpu_local_work_size = args
             .value_of("gpu_local_work_size")
-            .unwrap()
-            .parse()
-            .expect("Failed to parse GPU local work size option");
+            .map(|s| s
+                .parse()
+                .expect("Failed to parse GPU local work size option")
+            );
         let mut key_base = [0u8; 32];
         let params = ThreadParams {
             limit,
