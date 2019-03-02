@@ -36,31 +36,10 @@ mod pubkey_matcher;
 use pubkey_matcher::PubkeyMatcher;
 
 #[cfg(feature = "gpu")]
+mod gpu_impl;
+
 mod gpu;
-#[cfg(feature = "gpu")]
-use gpu::Gpu;
-
-#[cfg(not(feature = "gpu"))]
-struct Gpu;
-
-#[cfg(not(feature = "gpu"))]
-impl Gpu {
-    pub fn new(
-        _: usize,
-        _: usize,
-        _: usize,
-        _: &PubkeyMatcher,
-        _: GenerateKeyType,
-    ) -> Result<Gpu, String> {
-        eprintln!("GPU support has been disabled at compile time.");
-        eprintln!("Rebuild with \"--features gpu\" to enable GPU support.");
-        process::exit(1);
-    }
-
-    pub fn compute(&mut self, _: &mut [u8], _: &[u8]) -> Result<bool, String> {
-        unreachable!()
-    }
-}
+use gpu::{Gpu, GpuOptions};
 
 fn char_byte_mask(ch: char) -> (u8, u8) {
     if ch == '.' || ch == '*' {
@@ -411,14 +390,14 @@ fn main() {
             found_n: found_n_base.clone(),
             attempts: attempts_base.clone(),
         };
-        let mut gpu = Gpu::new(
-            gpu_platform,
-            gpu_device,
-            gpu_threads,
-            gpu_local_work_size,
-            &params.matcher,
-            gen_key_ty,
-        )
+        let mut gpu = Gpu::new(GpuOptions {
+            platform_idx: gpu_platform,
+            device_idx: gpu_device,
+            threads: gpu_threads,
+            local_work_size: gpu_local_work_size,
+            matcher: &params.matcher,
+            generate_key_type: gen_key_ty,
+        })
         .unwrap();
         gpu_thread = Some(thread::spawn(move || {
             let mut rng = OsRng::new().expect("Failed to get RNG for seed");

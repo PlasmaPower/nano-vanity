@@ -4,6 +4,7 @@ use blake2::Blake2b;
 use digest::{Input, VariableOutput};
 use num_bigint::BigInt;
 
+#[derive(Clone)]
 pub struct PubkeyMatcher {
     req: Vec<u8>,
     mask: Vec<u8>,
