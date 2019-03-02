@@ -49,6 +49,7 @@ impl Gpu {
         _: usize,
         _: usize,
         _: usize,
+        _: Option<usize>,
         _: &PubkeyMatcher,
         _: GenerateKeyType,
     ) -> Result<Gpu, String> {
