@@ -13,12 +13,12 @@ use curve25519_dalek::edwards::CompressedEdwardsY;
 extern crate blake2;
 extern crate clap;
 extern crate digest;
-extern crate ed25519_dalek;
 extern crate hex;
 extern crate num_cpus;
 
 extern crate rand;
-use rand::{OsRng, Rng};
+use rand::rngs::OsRng;
+use rand::RngCore;
 
 extern crate num_bigint;
 use num_bigint::BigInt;
@@ -331,9 +331,8 @@ fn main() {
     let mut thread_handles = Vec::with_capacity(threads);
     eprintln!("Estimated attempts needed: {}", estimated_attempts);
     for _ in 0..threads {
-        let mut rng = OsRng::new().expect("Failed to get RNG for seed");
         let mut key_or_seed = [0u8; 32];
-        rng.fill_bytes(&mut key_or_seed);
+        OsRng.fill_bytes(&mut key_or_seed);
         let params = ThreadParams {
             limit,
             output_progress,
@@ -345,7 +344,7 @@ fn main() {
         };
         thread_handles.push(thread::spawn(move || loop {
             if check_solution(&params, key_or_seed) {
-                rng.fill_bytes(&mut key_or_seed);
+                OsRng.fill_bytes(&mut key_or_seed);
             } else {
                 if output_progress {
                     params.attempts.fetch_add(1, atomic::Ordering::Relaxed);
@@ -400,10 +399,9 @@ fn main() {
         })
         .unwrap();
         gpu_thread = Some(thread::spawn(move || {
-            let mut rng = OsRng::new().expect("Failed to get RNG for seed");
             let mut found_private_key = [0u8; 32];
             loop {
-                rng.fill_bytes(&mut key_base);
+                OsRng.fill_bytes(&mut key_base);
                 let found = gpu
                     .compute(&mut found_private_key as _, &key_base as _)
                     .expect("Failed to run GPU computation");

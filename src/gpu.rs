@@ -19,9 +19,7 @@ pub struct Gpu;
 
 #[cfg(not(feature = "gpu"))]
 impl Gpu {
-    pub fn new(
-        _: GpuOptions,
-    ) -> Result<Gpu, String> {
+    pub fn new(_: GpuOptions) -> Result<Gpu, String> {
         eprintln!("GPU support has been disabled at compile time.");
         eprintln!("Rebuild with \"--features gpu\" to enable GPU support.");
         ::std::process::exit(1)
@@ -31,4 +29,3 @@ impl Gpu {
         unreachable!()
     }
 }
-

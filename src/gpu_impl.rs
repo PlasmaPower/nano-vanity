@@ -17,9 +17,7 @@ pub struct Gpu {
 }
 
 impl Gpu {
-    pub fn new(
-        opts: GpuOptions,
-    ) -> Result<Gpu> {
+    pub fn new(opts: GpuOptions) -> Result<Gpu> {
         let mut prog_bldr = ProgramBuilder::new();
         prog_bldr
             .src(include_str!("opencl/blake2b.cl"))

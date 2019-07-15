@@ -1,10 +1,9 @@
 use curve25519_dalek::constants::ED25519_BASEPOINT_TABLE;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar as CurveScalar;
-use ed25519_dalek::{PublicKey, SecretKey};
 
 use blake2::Blake2b;
-use digest::{Input, VariableOutput};
+use digest::{FixedOutput, Input, VariableOutput};
 
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
@@ -20,9 +19,18 @@ pub enum GenerateKeyType {
 }
 
 fn ed25519_privkey_to_pubkey(sec: &[u8; 32]) -> [u8; 32] {
-    let secret_key = SecretKey::from_bytes(sec).unwrap();
-    let public_key = PublicKey::from_secret::<Blake2b>(&secret_key);
-    public_key.to_bytes()
+    let mut hasher = Blake2b::default();
+    hasher.process(sec);
+    let hash_result = hasher.fixed_result();
+    let expanded = hash_result.as_slice();
+    let mut lower = [0u8; 32];
+    lower.copy_from_slice(&expanded[..32]);
+    lower[0] &= 248;
+    lower[31] &= 63;
+    lower[31] |= 64;
+    let scalar = CurveScalar::from_bits(lower);
+    let point = &scalar * &ED25519_BASEPOINT_TABLE;
+    point.compress().to_bytes()
 }
 
 pub fn secret_to_pubkey(key_material: [u8; 32], generate_key_type: GenerateKeyType) -> [u8; 32] {
