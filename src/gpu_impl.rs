@@ -1,3 +1,5 @@
+use byteorder::ByteOrder;
+use byteorder::NativeEndian;
 use ocl;
 use ocl::builders::DeviceSpecifier;
 use ocl::builders::ProgramBuilder;
@@ -12,7 +14,7 @@ use gpu::GpuOptions;
 
 pub struct Gpu {
     kernel: ocl::Kernel,
-    result: Buffer<u8>,
+    result: Buffer<u64>,
     key_root: Buffer<u8>,
 }
 
@@ -41,16 +43,17 @@ impl Gpu {
             .prog_bldr(prog_bldr)
             .platform(platforms[opts.platform_idx])
             .device(DeviceSpecifier::Indices(vec![opts.device_idx]))
-            .dims(64)
+            .dims(1)
             .build()?;
 
         let device = pro_que.device();
         eprintln!("Initializing GPU {} {}", device.vendor()?, device.name()?);
 
         let result = pro_que
-            .buffer_builder::<u8>()
+            .buffer_builder::<u64>()
             .flags(MemFlags::new().write_only())
             .build()?;
+        pro_que.set_dims(64);
         let key_root = pro_que
             .buffer_builder::<u8>()
             .flags(MemFlags::new().read_only().host_write_only())
@@ -73,7 +76,7 @@ impl Gpu {
 
         req.write(opts.matcher.req()).enq()?;
         mask.write(opts.matcher.mask()).enq()?;
-        result.write(&[0u8; 32] as &[u8]).enq()?;
+        result.write(&[!0u64] as &[u64]).enq()?;
         let gen_key_type_code: u8 = match opts.generate_key_type {
             GenerateKeyType::PrivateKey => 0,
             GenerateKeyType::Seed => 1,
@@ -112,19 +115,24 @@ impl Gpu {
         self.key_root.write(key_root).enq()?;
         debug_assert!(out.iter().all(|&b| b == 0));
         debug_assert!({
-            let mut result = [0u8; 32];
-            self.result.read(&mut result as &mut [u8]).enq()?;
-            result.iter().all(|&b| b == 0)
+            let mut result = [0u64];
+            self.result.read(&mut result as &mut [u64]).enq()?;
+            result == [!0u64]
         });
 
         unsafe {
             self.kernel.enq()?;
         }
 
-        self.result.read(&mut *out).enq()?;
-        let success = !out.iter().all(|&b| b == 0);
+        let mut buf = [0u64];
+        self.result.read(&mut buf as &mut [u64]).enq()?;
+        let thread = buf[0];
+        let success = thread != !0u64;
         if success {
-            self.result.write(&[0u8; 32] as &[u8]).enq()?;
+            self.result.write(&[!0u64] as &[u64]).enq()?;
+            let base = NativeEndian::read_u64(key_root);
+            NativeEndian::write_u64(out, base.wrapping_add(thread));
+            out[8..].copy_from_slice(&key_root[8..]);
         }
         Ok(success)
     }

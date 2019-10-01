@@ -11,6 +11,7 @@ extern crate curve25519_dalek;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 
 extern crate blake2;
+extern crate byteorder;
 extern crate clap;
 extern crate digest;
 extern crate hex;
@@ -206,6 +207,9 @@ fn main() {
     if let Some(mut prefix) = args.value_of("prefix") {
         if prefix.starts_with("xrb_") {
             prefix = &prefix[4..];
+        }
+        if prefix.starts_with("nano_") {
+            prefix = &prefix[5..];
         }
         let mut prefix_chars = prefix.chars();
         let mut prefix_req = BigInt::default();
@@ -416,7 +420,7 @@ fn main() {
                 if !check_solution(&params, found_private_key) {
                     eprintln!(
                         "GPU returned non-matching solution: {}",
-                        hex::encode_upper(&found_private_key)
+                        hex::encode_upper(&found_private_key),
                     );
                 }
                 for byte in &mut found_private_key {

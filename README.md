@@ -16,7 +16,7 @@ cargo install nano-vanity
 To install `nano-vanity` from source:
 
 ```
-cargo install
+cargo install --path .
 ```
 
 If you want to enable GPU support, install OpenCL and add `--features gpu` to the install command.
