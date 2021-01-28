@@ -227,7 +227,7 @@ fn main() {
         if prefix_chars.next().is_some() {
             eprintln!("Warning: prefix too long.");
             eprintln!(
-                "Only the first 60 characters of your prefix (not including xrb_) will be used."
+                "Only the first 60 characters of your prefix (not including nano_) will be used."
             );
             eprintln!("");
         }

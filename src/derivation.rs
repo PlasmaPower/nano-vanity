@@ -70,7 +70,7 @@ pub fn pubkey_to_address(pubkey: [u8; 32]) -> String {
         reverse_chars.push(ADDRESS_ALPHABET[n.to_usize().unwrap()]);
         ext_pubkey_int = ext_pubkey_int >> 5;
     }
-    reverse_chars.extend(b"_brx"); // xrb_ reversed
+    reverse_chars.extend(b"_onan"); // nano_ reversed
     reverse_chars
         .iter()
         .rev()
@@ -89,7 +89,7 @@ mod tests {
         // Seed: fb15ac405d762002202c66bd249589ad450d55631f7b1cd44fef19fcccbc6372
         // Secret: 847B0EC950A7F5B6AD6C3A1AA5A5B940608435B59F201662D13A6D11F65F7DA6
         // Pubkey: D741569435DC9698AAE5212A437F5DEDA76EFC4288CA3FCDE9604190A861FE07
-        // Address: xrb_3ot3ctc5dq6pm4ogcabcafzouuf9fuy6748c9z8ykr43k4n85zi9zec5bxnz
+        // Address: nano_3ot3ctc5dq6pm4ogcabcafzouuf9fuy6748c9z8ykr43k4n85zi9zec5bxnz
         let mut privkey = [0u8; 32];
         privkey.copy_from_slice(
             &hex::decode("847B0EC950A7F5B6AD6C3A1AA5A5B940608435B59F201662D13A6D11F65F7DA6")
@@ -109,7 +109,7 @@ mod tests {
         // Seed: fb15ac405d762002202c66bd249589ad450d55631f7b1cd44fef19fcccbc6372
         // Secret: 847B0EC950A7F5B6AD6C3A1AA5A5B940608435B59F201662D13A6D11F65F7DA6
         // Pubkey: D741569435DC9698AAE5212A437F5DEDA76EFC4288CA3FCDE9604190A861FE07
-        // Address: xrb_3ot3ctc5dq6pm4ogcabcafzouuf9fuy6748c9z8ykr43k4n85zi9zec5bxnz
+        // Address: nano_3ot3ctc5dq6pm4ogcabcafzouuf9fuy6748c9z8ykr43k4n85zi9zec5bxnz
         let mut privkey = [0u8; 32];
         privkey.copy_from_slice(
             &hex::decode("847B0EC950A7F5B6AD6C3A1AA5A5B940608435B59F201662D13A6D11F65F7DA6")
@@ -132,7 +132,7 @@ mod tests {
         // Seed: fb15ac405d762002202c66bd249589ad450d55631f7b1cd44fef19fcccbc6372
         // Secret: 847B0EC950A7F5B6AD6C3A1AA5A5B940608435B59F201662D13A6D11F65F7DA6
         // Pubkey: D741569435DC9698AAE5212A437F5DEDA76EFC4288CA3FCDE9604190A861FE07
-        // Address: xrb_3ot3ctc5dq6pm4ogcabcafzouuf9fuy6748c9z8ykr43k4n85zi9zec5bxnz
+        // Address: nano_3ot3ctc5dq6pm4ogcabcafzouuf9fuy6748c9z8ykr43k4n85zi9zec5bxnz
         let mut seed = [0u8; 32];
         seed.copy_from_slice(
             &hex::decode("fb15ac405d762002202c66bd249589ad450d55631f7b1cd44fef19fcccbc6372")
@@ -155,7 +155,7 @@ mod tests {
         // Seed: fb15ac405d762002202c66bd249589ad450d55631f7b1cd44fef19fcccbc6372
         // Secret: 847B0EC950A7F5B6AD6C3A1AA5A5B940608435B59F201662D13A6D11F65F7DA6
         // Pubkey: D741569435DC9698AAE5212A437F5DEDA76EFC4288CA3FCDE9604190A861FE07
-        // Address: xrb_3ot3ctc5dq6pm4ogcabcafzouuf9fuy6748c9z8ykr43k4n85zi9zec5bxnz
+        // Address: nano_3ot3ctc5dq6pm4ogcabcafzouuf9fuy6748c9z8ykr43k4n85zi9zec5bxnz
         let mut pubkey = [0u8; 32];
         pubkey.copy_from_slice(
             &hex::decode("D741569435DC9698AAE5212A437F5DEDA76EFC4288CA3FCDE9604190A861FE07")
@@ -163,7 +163,7 @@ mod tests {
         );
         assert_eq!(
             pubkey_to_address(pubkey),
-            "xrb_3ot3ctc5dq6pm4ogcabcafzouuf9fuy6748c9z8ykr43k4n85zi9zec5bxnz"
+            "nano_3ot3ctc5dq6pm4ogcabcafzouuf9fuy6748c9z8ykr43k4n85zi9zec5bxnz"
         );
     }
 }
