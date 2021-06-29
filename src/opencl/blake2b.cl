@@ -259,7 +259,7 @@ static int blake2b_update( __private blake2b_state *S, const uchar *in, ulong in
   }
   return 0;
 }
-/* Is this correct? */
+
 static int blake2b_final( __private blake2b_state *S, uchar *out, uchar outlen )
 {
   uchar buffer[BLAKE2B_OUTBYTES];
