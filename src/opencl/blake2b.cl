@@ -292,21 +292,3 @@ static void ucharcpyglb (uchar * dst, __global uchar const * src, size_t count)
 		++src;
 	}
 }
-	
-__kernel void nano_work (__global ulong const * attempt, __global ulong * result_a, __global uchar const * item_a, __global ulong const * difficulty_a)
-{
-	int const thread = get_global_id (0);
-	uchar item_l [32];
-	ucharcpyglb (item_l, item_a, 32);
-	ulong attempt_l = *attempt + thread;
-	blake2b_state state;
-	blake2b_init (&state, sizeof (ulong));
-	blake2b_update (&state, (uchar *) &attempt_l, sizeof (ulong));
-	blake2b_update (&state, item_l, 32);
-	ulong result;
-	blake2b_final (&state, (uchar *) &result, sizeof (result));
-	if (result >= *difficulty_a)
-	{
-		*result_a = attempt_l;
-	}
-}
