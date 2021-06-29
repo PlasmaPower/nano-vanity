@@ -1,3 +1,5 @@
+// Taken from Nano's openclwork.cpp
+
 enum blake2b_constant
 {
 	BLAKE2B_BLOCKBYTES = 128,
