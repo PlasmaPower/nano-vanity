@@ -2,8 +2,8 @@ use curve25519_dalek::constants::ED25519_BASEPOINT_TABLE;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar as CurveScalar;
 
-use blake2::Blake2b;
-use digest::{FixedOutput, Input, VariableOutput};
+use blake2::{Blake2b, VarBlake2b};
+use digest::{FixedOutput, Update, VariableOutput};
 
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
@@ -20,8 +20,8 @@ pub enum GenerateKeyType {
 
 fn ed25519_privkey_to_pubkey(sec: &[u8; 32]) -> [u8; 32] {
     let mut hasher = Blake2b::default();
-    hasher.process(sec);
-    let hash_result = hasher.fixed_result();
+    hasher.update(sec);
+    let hash_result = hasher.finalize_fixed();
     let expanded = hash_result.as_slice();
     let mut lower = [0u8; 32];
     lower.copy_from_slice(&expanded[..32]);
@@ -41,10 +41,10 @@ pub fn secret_to_pubkey(key_material: [u8; 32], generate_key_type: GenerateKeyTy
             // HD keys are not yet standardized (https://github.com/nanocurrency/raiblocks/issues/601)
             let address_index = [0, 0, 0, 0];
             let mut private_key = [0u8; 32];
-            let mut hasher = Blake2b::new(32).unwrap();
-            hasher.process(&key_material);
-            hasher.process(&address_index);
-            hasher.variable_result(&mut private_key).unwrap();
+            let mut hasher = VarBlake2b::new(32).unwrap();
+            hasher.update(&key_material);
+            hasher.update(&address_index);
+            hasher.finalize_variable(|h| private_key.copy_from_slice(h));
             ed25519_privkey_to_pubkey(&private_key)
         }
         GenerateKeyType::ExtendedPrivateKey(offset) => {
@@ -58,10 +58,10 @@ pub fn secret_to_pubkey(key_material: [u8; 32], generate_key_type: GenerateKeyTy
 /// Only used when outputting addresses to user. Not for speed.
 pub fn pubkey_to_address(pubkey: [u8; 32]) -> String {
     let mut reverse_chars = Vec::<u8>::new();
-    let mut check_hash = Blake2b::new(5).unwrap();
-    check_hash.process(&pubkey as &[u8]);
+    let mut check_hash = VarBlake2b::new(5).unwrap();
+    check_hash.update(&pubkey);
     let mut check = [0u8; 5];
-    check_hash.variable_result(&mut check).unwrap();
+    check_hash.finalize_variable(|h| check.copy_from_slice(h));
     let mut ext_pubkey = pubkey.to_vec();
     ext_pubkey.extend(check.iter().rev());
     let mut ext_pubkey_int = BigInt::from_bytes_be(num_bigint::Sign::Plus, &ext_pubkey);

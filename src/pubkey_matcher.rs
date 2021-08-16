@@ -1,7 +1,7 @@
 use std::cmp;
 
-use blake2::Blake2b;
-use digest::{Input, VariableOutput};
+use blake2::VarBlake2b;
+use digest::{Update, VariableOutput};
 use num_bigint::BigInt;
 
 #[derive(Clone)]
@@ -56,9 +56,9 @@ impl PubkeyMatcher {
         }
         if self.prefix_len > 32 {
             let mut checksum = [0u8; 5];
-            let mut hasher = Blake2b::new(checksum.len()).unwrap();
-            hasher.process(pubkey as &[u8]);
-            hasher.variable_result(&mut checksum as &mut [u8]).unwrap();
+            let mut hasher = VarBlake2b::new(checksum.len()).unwrap();
+            hasher.update(pubkey as &[u8]);
+            hasher.finalize_variable(|h| checksum.copy_from_slice(h));
             for i in 32..self.prefix_len {
                 if checksum[4 - (i - 32)] & self.mask[i] != self.req[i] {
                     return false;

@@ -56,20 +56,14 @@ checksum = "b3c30d3802dfb7281680d6285f2ccdaa8c2d8fee41f93805dba5c4cf50dc23cf"
 
 [[package]]
 name = "blake2"
-version = "0.7.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0da79fe9391e02df251e0d86197332d398b4721e80722fc91b9c4cbde3ce355"
+checksum = "10a5720225ef5daecf08657f23791354e1685a8c91a4c60c7f3d3b2892f978f4"
 dependencies = [
- "byte-tools",
  "crypto-mac",
- "digest 0.7.2",
+ "digest 0.9.0",
+ "opaque-debug",
 ]
-
-[[package]]
-name = "byte-tools"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "560c32574a12a89ecd91f5e742165893f86e3ab98d21f8ea548658eb9eef5f40"
 
 [[package]]
 name = "byteorder"
@@ -133,12 +127,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "constant_time_eq"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ff012e225ce166d4422e0e78419d901719760f62ae2b7969ca6b564d1b54a9e"
-
-[[package]]
 name = "crossbeam"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -146,12 +134,12 @@ checksum = "24ce9782d4d5c53674646a6a4c1863a21a8fc0cb649b3c94dfc16e45071dea19"
 
 [[package]]
 name = "crypto-mac"
-version = "0.5.2"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0999b4ff4d3446d4ddb19a63e9e00c1876e75cd7000d20e57a693b4b3f08d958"
+checksum = "b584a330336237c1eecd3e94266efb216c56ed91225d634cb2991c5f3fd1aeab"
 dependencies = [
- "constant_time_eq",
- "generic-array 0.9.0",
+ "generic-array 0.14.4",
+ "subtle",
 ]
 
 [[package]]
@@ -169,20 +157,20 @@ dependencies = [
 
 [[package]]
 name = "digest"
-version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00a49051fef47a72c9623101b19bd71924a45cca838826caae3eaa4d00772603"
-dependencies = [
- "generic-array 0.9.0",
-]
-
-[[package]]
-name = "digest"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05f47366984d3ad862010e22c7ce81a7dbcaebbdfb37241a620f8b6596ee135c"
 dependencies = [
  "generic-array 0.12.0",
+]
+
+[[package]]
+name = "digest"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3dd60d1080a57a05ab032377049e0591415d2b31afd7028356dbf3cc6dcb066"
+dependencies = [
+ "generic-array 0.14.4",
 ]
 
 [[package]]
@@ -239,20 +227,21 @@ checksum = "0bab5b5e94f5c31fc764ba5dd9ad16568aae5d4825538c01d6bca680c9bf94a7"
 
 [[package]]
 name = "generic-array"
-version = "0.9.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef25c5683767570c2bbd7deba372926a55eaae9982d7726ee2a1050239d45b9d"
+checksum = "3c0f28c2f5bfb5960175af447a2da7c18900693738343dc896ffbcabd9839592"
 dependencies = [
  "typenum",
 ]
 
 [[package]]
 name = "generic-array"
-version = "0.12.0"
+version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c0f28c2f5bfb5960175af447a2da7c18900693738343dc896ffbcabd9839592"
+checksum = "501466ecc8a30d1d3b7fc9229b122b2ce8ed6e9d9223f1138d4babb253e51817"
 dependencies = [
  "typenum",
+ "version_check",
 ]
 
 [[package]]
@@ -294,7 +283,7 @@ dependencies = [
  "byteorder",
  "clap",
  "curve25519-dalek",
- "digest 0.7.2",
+ "digest 0.9.0",
  "hex",
  "num-bigint",
  "num-traits 0.2.0",
@@ -438,6 +427,12 @@ checksum = "b4072920739958adeec5abedec51af70febc58f7fff0601aaa0827c1f3c8fefd"
 dependencies = [
  "num",
 ]
+
+[[package]]
+name = "opaque-debug"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "ppv-lite86"
@@ -632,9 +627,9 @@ dependencies = [
 
 [[package]]
 name = "typenum"
-version = "1.10.0"
+version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "612d636f949607bdf9b123b4a6f6d966dedf3ff669f7f045890d3a4a73948169"
+checksum = "879f6906492a7cd215bfa4cf595b600146ccfac0c79bcbd1f3000162af5e8b06"
 
 [[package]]
 name = "unicode-width"
@@ -653,6 +648,12 @@ name = "vec_map"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "887b5b631c2ad01628bbbaa7dd4c869f80d3186688f8d0b6f58774fbe324988c"
+
+[[package]]
+name = "version_check"
+version = "0.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fecdca9a5291cc2b8dcf7dc02453fee791a280f3743cb0905f8822ae463b3fe"
 
 [[package]]
 name = "winapi"
