@@ -277,7 +277,7 @@ checksum = "d44e80633f007889c7eff624b709ab43c92d708caad982295768a7b13ca3b5eb"
 
 [[package]]
 name = "nano-vanity"
-version = "0.4.11"
+version = "0.4.12"
 dependencies = [
  "blake2",
  "byteorder",
