@@ -25,7 +25,7 @@ extern crate num_bigint;
 use num_bigint::BigInt;
 
 extern crate num_traits;
-use num_traits::{ToPrimitive, Zero};
+use num_traits::{Zero};
 
 #[cfg(feature = "gpu")]
 extern crate ocl;
@@ -292,7 +292,7 @@ fn main() {
             .collect();
     }
     let matcher_base = PubkeyMatcher::new(ext_pubkey_req, ext_pubkey_mask);
-    let estimated_attempts = matcher_base.estimated_attempts();
+    let finding_chance = matcher_base.finding_chance();
     let matcher_base = Arc::new(matcher_base);
     let limit = args
         .value_of("limit")
@@ -333,7 +333,7 @@ fn main() {
         .map(|s| s.parse().expect("Failed to parse thread count option"))
         .unwrap_or_else(|| num_cpus::get() - 1);
     let mut thread_handles = Vec::with_capacity(threads);
-    eprintln!("Estimated attempts needed: {}", estimated_attempts);
+    eprintln!("Estimated attempts for 90% chance to find a match: {:.0}", -1.0_f64 / (1.0_f64 - finding_chance).log10());
     for _ in 0..threads {
         let mut key_or_seed = [0u8; 32];
         OsRng.fill_bytes(&mut key_or_seed);
@@ -423,6 +423,7 @@ fn main() {
                         hex::encode_upper(&found_private_key),
                     );
                 }
+                params.attempts.store(0, atomic::Ordering::Relaxed);
                 for byte in &mut found_private_key {
                     *byte = 0;
                 }
@@ -435,7 +436,7 @@ fn main() {
         thread::spawn(move || loop {
             let attempts = attempts.load(atomic::Ordering::Relaxed);
             let estimated_percent =
-                100. * (attempts as f64) / estimated_attempts.to_f64().unwrap_or(f64::INFINITY);
+                100. * (1.0 - (1.0 - finding_chance).powf(attempts as f64));
             let runtime = start_time.elapsed();
             let keys_per_second = (attempts as f64)
                 // simplify to .as_millis() when available

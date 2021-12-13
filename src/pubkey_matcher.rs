@@ -2,7 +2,6 @@ use std::cmp;
 
 use blake2::VarBlake2b;
 use digest::{Update, VariableOutput};
-use num_bigint::BigInt;
 
 #[derive(Clone)]
 pub struct PubkeyMatcher {
@@ -68,11 +67,11 @@ impl PubkeyMatcher {
         true
     }
 
-    pub fn estimated_attempts(&self) -> BigInt {
+    pub fn finding_chance(&self) -> f64 {
         let mut bits_in_mask = 0;
         for byte in &self.mask {
-            bits_in_mask += byte.count_ones() as usize;
+            bits_in_mask += byte.count_ones() as i32;
         }
-        BigInt::from(1) << bits_in_mask
+        2.0_f64.powi(-bits_in_mask)
     }
 }
