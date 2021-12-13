@@ -115,6 +115,7 @@ fn check_solution(params: &ThreadParams, key_material: [u8; 32]) -> bool {
             public_key,
             params.simple_output,
         );
+        params.attempts.store(0, atomic::Ordering::Relaxed);
         if params.limit != 0
             && params.found_n.fetch_add(1, atomic::Ordering::Relaxed) + 1 >= params.limit
         {
@@ -423,7 +424,6 @@ fn main() {
                         hex::encode_upper(&found_private_key),
                     );
                 }
-                params.attempts.store(0, atomic::Ordering::Relaxed);
                 for byte in &mut found_private_key {
                     *byte = 0;
                 }
