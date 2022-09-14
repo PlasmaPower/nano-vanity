@@ -333,7 +333,9 @@ fn main() {
         .map(|s| s.parse().expect("Failed to parse thread count option"))
         .unwrap_or_else(|| num_cpus::get() - 1);
     let mut thread_handles = Vec::with_capacity(threads);
-    eprintln!("Estimated attempts needed: {}", estimated_attempts);
+    if !simple_output {
+        eprintln!("Estimated attempts needed: {}", estimated_attempts);
+    }
     for _ in 0..threads {
         let mut key_or_seed = [0u8; 32];
         OsRng.fill_bytes(&mut key_or_seed);
