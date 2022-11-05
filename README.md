@@ -65,7 +65,7 @@ To change your GPU platform, use `--gpu-platform [index]`.
 ## Testing randomness
 
 To test the randomness of seeds from this program, you can use dieharder
-([here](http://www.linux-mag.com/id/4125/)'s an article on it).
+([here](https://web.archive.org/web/20161029064924/www.linux-mag.com/id/4125/)'s an article on it).
 
 Dieharder should not be taken as proof that this program is secure, however, it should be used as evidence, in combination
 with an examination of the program's source code.
