@@ -10,6 +10,7 @@ pub struct GpuOptions<'a> {
     pub device_idx: usize,
     pub threads: usize,
     pub local_work_size: Option<usize>,
+    pub global_work_size: Option<usize>,
     pub matcher: &'a PubkeyMatcher,
     pub generate_key_type: GenerateKeyType,
 }

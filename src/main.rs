@@ -174,6 +174,11 @@ fn main() {
                 .value_name("N")
                 .help("The GPU local work size. Increasing it may increase performance. For advanced users only."),
         ).arg(
+            clap::Arg::with_name("gpu_global_work-size")
+                .long("gpu-global-work-size")
+                .value_name("N")
+                .help("The GPU global work size. Increasing it may increase performance. For advanced users only."),
+        ).arg(
             clap::Arg::with_name("no_progress")
                 .long("no-progress")
                 .help("Disable progress output"),
@@ -385,6 +390,10 @@ fn main() {
             s.parse()
                 .expect("Failed to parse GPU local work size option")
         });
+        let gpu_global_work_size = args.value_of("gpu_global_work_size").map(|s| {
+            s.parse()
+                .expect("Failed to parse GPU local work size option")
+        });
         let mut key_base = [0u8; 32];
         let params = ThreadParams {
             limit,
@@ -400,6 +409,7 @@ fn main() {
             device_idx: gpu_device,
             threads: gpu_threads,
             local_work_size: gpu_local_work_size,
+            global_work_size: gpu_global_work_size,
             matcher: &params.matcher,
             generate_key_type: gen_key_ty,
         })
