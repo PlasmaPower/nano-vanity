@@ -101,6 +101,9 @@ impl Gpu {
             if let Some(local_work_size) = opts.local_work_size {
                 kernel_builder.local_work_size(local_work_size);
             }
+            if let Some(global_work_size) = opts.global_work_size {
+                kernel_builder.global_work_size(global_work_size);
+            }
             kernel_builder.build()?
         };
 
