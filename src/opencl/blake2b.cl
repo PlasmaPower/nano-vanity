@@ -54,10 +54,12 @@ __constant static const uchar blake2b_sigma[12][16] =
   { 14, 10,  4,  8,  9, 15, 13,  6,  1, 12,  0,  2, 11,  7,  5,  3 }
 };
 
-#define UCHARCPY(dst, src, n)            \
-    do {                               \
-        for (int i = 0; i < (n); i++)  \
-            (dst)[i] = (src)[i];       \
+#define UCHARCPY(dst, src, n)                 \
+    do {                                      \
+        __private uchar* _dst = (dst);        \
+        __private const uchar* _src = (src);  \
+        for (size_t i = 0; i < (n); i++)         \
+            _dst[i] = _src[i];                \
     } while (0)
 
 static inline int blake2b_set_lastnode( blake2b_state *S )
