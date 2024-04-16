@@ -53,6 +53,13 @@ __constant static const uchar blake2b_sigma[12][16] =
   {  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15 } ,
   { 14, 10,  4,  8,  9, 15, 13,  6,  1, 12,  0,  2, 11,  7,  5,  3 }
 };
+
+#define UCHARCPY(dst, src, n)            \
+    do {                               \
+        for (int i = 0; i < (n); i++)  \
+            (dst)[i] = (src)[i];       \
+    } while (0)
+
 static inline int blake2b_set_lastnode( blake2b_state *S )
 {
   S->f[1] = ~0UL;
@@ -215,13 +222,7 @@ static int blake2b_compress( __private blake2b_state *S, __private const uchar b
 #undef ROUND
   return 0;
 }
-static void ucharcpy (uchar * dst, uchar const * src, size_t count)
-{
-	for (size_t i = 0; i < count; ++i)
-	{
-		*dst++ = *src++;
-	}
-}
+
 void printstate (blake2b_state * S)
 {
 	printf ("%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu ", S->h[0], S->h[1], S->h[2], S->h[3], S->h[4], S->h[5], S->h[6], S->h[7], S->t[0], S->t[1], S->f[0], S->f[1]);
@@ -240,18 +241,18 @@ static int blake2b_update( __private blake2b_state *S, const uchar *in, ulong in
 	size_t fill = 2 * BLAKE2B_BLOCKBYTES - left;
 	if( inlen > fill )
 	{
-	  ucharcpy( S->buf + left, in, fill ); // Fill buffer
+	  UCHARCPY( S->buf + left, in, fill ); // Fill buffer
 	  S->buflen += fill;
 	  blake2b_increment_counter( S, BLAKE2B_BLOCKBYTES );
 	  blake2b_compress( S, S->buf ); // Compress
-	  ucharcpy( S->buf, S->buf + BLAKE2B_BLOCKBYTES, BLAKE2B_BLOCKBYTES ); // Shift buffer left
+	  UCHARCPY( S->buf, S->buf + BLAKE2B_BLOCKBYTES, BLAKE2B_BLOCKBYTES ); // Shift buffer left
 	  S->buflen -= BLAKE2B_BLOCKBYTES;
 	  in += fill;
 	  inlen -= fill;
 	}
 	else // inlen <= fill
 	{
-	  ucharcpy( S->buf + left, in, inlen );
+	  UCHARCPY( S->buf + left, in, inlen );
 	  S->buflen += inlen; // Be lazy, do not compress
 	  in += inlen;
 	  inlen -= inlen;
@@ -265,32 +266,23 @@ static int blake2b_final( __private blake2b_state *S, uchar *out, uchar outlen )
   uchar buffer[BLAKE2B_OUTBYTES];
   if( S->buflen > BLAKE2B_BLOCKBYTES )
   {
-	blake2b_increment_counter( S, BLAKE2B_BLOCKBYTES );
-	blake2b_compress( S, S->buf );
-	S->buflen -= BLAKE2B_BLOCKBYTES;
-	ucharcpy( S->buf, S->buf + BLAKE2B_BLOCKBYTES, S->buflen );
+    blake2b_increment_counter( S, BLAKE2B_BLOCKBYTES );
+    blake2b_compress( S, S->buf );
+    S->buflen -= BLAKE2B_BLOCKBYTES;
+    UCHARCPY( S->buf, S->buf + BLAKE2B_BLOCKBYTES, S->buflen );
   }
   //blake2b_increment_counter( S, S->buflen );
   ulong inc = (ulong)S->buflen;
   S->t[0] += inc;
-//  if ( S->t[0] < inc )
-//    S->t[1] += 1;
+  //if ( S->t[0] < inc )
+  //  S->t[1] += 1;
   // This seems to crash the opencl compiler though fortunately this is calculating size and we don't do things bigger than 2^32
-	
+  
   blake2b_set_lastblock( S );
-  ucharset( S->buf + S->buflen, 0, 2 * BLAKE2B_BLOCKBYTES - S->buflen ); /* Padding */
+  ucharset( S->buf + S->buflen, 0, 2 * BLAKE2B_BLOCKBYTES - S->buflen ); // Padding
   blake2b_compress( S, S->buf );
-  for( int i = 0; i < 8; ++i ) /* Output full hash to temp buffer */
-	store64( buffer + sizeof( S->h[i] ) * i, S->h[i] );
-  ucharcpy( out, buffer, outlen );
+  for( int i = 0; i < 8; ++i ) // Output full hash to temp buffer
+    store64( buffer + sizeof( S->h[i] ) * i, S->h[i] );
+  UCHARCPY( out, buffer, outlen );
   return 0;
-}
-static void ucharcpyglb (uchar * dst, __global uchar const * src, size_t count)
-{
-	for (size_t i = 0; i < count; ++i)
-	{
-		*dst = *src;
-		++dst;
-		++src;
-	}
 }
