@@ -21,8 +21,13 @@ pub struct Gpu {
 impl Gpu {
     pub fn new(opts: GpuOptions) -> Result<Gpu> {
         let mut prog_bldr = ProgramBuilder::new();
+        let namespace_qualifier = if cfg!(feature = "apple") {
+            "#define NAMESPACE_QUALIFIER __private\n"
+        } else {
+            "#define NAMESPACE_QUALIFIER __generic\n"
+        };
         prog_bldr
-            .src(include_str!("opencl/util.cl")) // TODO: support util-apple behind cfg flag?
+            .source(namespace_qualifier)
             .src(include_str!("opencl/blake2b.cl"))
             .src(include_str!("opencl/curve25519-constants.cl"))
             .src(include_str!("opencl/curve25519-constants2.cl"))
