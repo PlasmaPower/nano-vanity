@@ -56,8 +56,8 @@ __constant static const uchar blake2b_sigma[12][16] =
 
 #define UCHARCPY(dst, src, n)                 \
     do {                                      \
-        __private uchar* _dst = (dst);        \
-        __private const uchar* _src = (src);  \
+        NAMESPACE_QUALIFIER uchar* _dst = (dst);        \
+        NAMESPACE_QUALIFIER const uchar* _src = (src);  \
         for (size_t i = 0; i < (n); i++)         \
             _dst[i] = _src[i];                \
     } while (0)
