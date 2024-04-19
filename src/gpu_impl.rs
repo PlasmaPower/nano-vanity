@@ -22,6 +22,7 @@ impl Gpu {
     pub fn new(opts: GpuOptions) -> Result<Gpu> {
         let mut prog_bldr = ProgramBuilder::new();
         prog_bldr
+            .src(include_str!("opencl/util.cl")) // TODO: support util-apple behind cfg flag?
             .src(include_str!("opencl/blake2b.cl"))
             .src(include_str!("opencl/curve25519-constants.cl"))
             .src(include_str!("opencl/curve25519-constants2.cl"))
