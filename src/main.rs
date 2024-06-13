@@ -125,6 +125,8 @@ fn check_solution(params: &ThreadParams, key_material: [u8; 32]) -> bool {
 }
 
 fn main() {
+    const STACK_SIZE: usize = 8 * 1024 * 1024; // 8 MB
+    std::thread::Builder::new().stack_size(STACK_SIZE).spawn(|| {
     let args = clap::App::new("nano-vanity")
         .version(env!("CARGO_PKG_VERSION"))
         .author("Lee Bousfield <ljbousfield@gmail.com>")
@@ -467,4 +469,5 @@ fn main() {
     }
     eprintln!("No computation devices specified");
     process::exit(1);
+    }).expect("Failed to run main thread").join().expect("Failed to join main thread");
 }
